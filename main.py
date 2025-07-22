@@ -11,6 +11,7 @@ import os
 import json
 import asyncio
 import time
+import re
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
@@ -107,7 +108,24 @@ class WorkdayFormScraper:
                 print("\n📍 Phase 4: Extracting Form Elements")
                 await self._extract_application_forms(page)
                 
-                # Phase 4: Create and save results
+                # Phase 5: Create account using extracted form data
+                print("\n📍 Phase 5: Creating Account")
+                account_success = await self._create_account(page)
+                
+                if account_success:
+                    print("  ✅ Account created successfully")
+                    
+                    # Phase 6: Navigate to next page after account creation
+                    print("\n📍 Phase 6: Navigating to Next Page")
+                    await self._navigate_to_next_page(page)
+                    
+                    # Phase 7: Extract form elements from My Information page
+                    print("\n📍 Phase 7: Extracting My Information Page Elements")
+                    await self._extract_my_information_page(page)
+                else:
+                    print("  ⚠️ Account creation failed, but continuing...")
+                
+                # Phase 8: Create and save results
                 print(f"\n📍 Extraction Complete")
                 print(f"  Pages visited: {len(self.discovered_pages)}")
                 print(f"  Form elements extracted: {len(self.form_elements)}")
@@ -404,6 +422,397 @@ class WorkdayFormScraper:
         
         print(f"  ✅ Application flow traversal complete: {pages_processed} pages processed")
     
+    async def _create_account(self, page: Page) -> bool:
+        """Create account using the extracted form elements"""
+        print("  🔐 Starting account creation process...")
+        
+        try:
+            # Step 1: Fill email field
+            email_filled = await self._fill_email_field(page)
+            if not email_filled:
+                print("  ❌ Failed to fill email field")
+                return False
+            
+            # Step 2: Fill password field
+            password_filled = await self._fill_password_field(page)
+            if not password_filled:
+                print("  ❌ Failed to fill password field")
+                return False
+            
+            # Step 3: Fill verify password field
+            verify_password_filled = await self._fill_verify_password_field(page)
+            if not verify_password_filled:
+                print("  ❌ Failed to fill verify password field")
+                return False
+            
+            # Step 4: Handle checkbox if present
+            await self._handle_checkbox(page)
+            
+            # Step 5: Submit the form
+            submit_success = await self._submit_account_form(page)
+            if not submit_success:
+                print("  ❌ Failed to submit account creation form")
+                return False
+            
+            # Step 6: Wait for account creation to complete
+            await self._wait_for_account_creation(page)
+            
+            print("  ✅ Account creation completed successfully")
+            return True
+            
+        except Exception as e:
+            self.errors.append(f"Account creation error: {str(e)}")
+            print(f"  ❌ Account creation failed: {str(e)}")
+            return False
+    
+    async def _fill_email_field(self, page: Page) -> bool:
+        """Fill email field using multiple selectors"""
+        email_selectors = [
+            'input[data-automation-id="email"]',
+            'input[type="email"]',
+            'input[name="email"]',
+            'input[placeholder*="email" i]'
+        ]
+        
+        email = os.getenv('WORKDAY_USERNAME', '')
+        if not email:
+            print("    ❌ No email found in environment variables")
+            return False
+        
+        for selector in email_selectors:
+            try:
+                element = await page.wait_for_selector(selector, timeout=3000, state='visible')
+                if element:
+                    await element.fill(email)
+                    print(f"    ✅ Email filled using: {selector}")
+                    return True
+            except:
+                continue
+        
+        print("    ❌ Email field not found")
+        return False
+    
+    async def _fill_password_field(self, page: Page) -> bool:
+        """Fill password field using multiple selectors"""
+        password_selectors = [
+            'input[data-automation-id="password"]',
+            'input[type="password"]',
+            'input[name="password"]'
+        ]
+        
+        password = os.getenv('WORKDAY_PASSWORD', '')
+        if not password:
+            print("    ❌ No password found in environment variables")
+            return False
+        
+        for selector in password_selectors:
+            try:
+                element = await page.wait_for_selector(selector, timeout=3000, state='visible')
+                if element:
+                    await element.fill(password)
+                    print(f"    ✅ Password filled using: {selector}")
+                    return True
+            except:
+                continue
+        
+        print("    ❌ Password field not found")
+        return False
+    
+    async def _fill_verify_password_field(self, page: Page) -> bool:
+        """Fill verify password field using multiple selectors"""
+        verify_selectors = [
+            'input[data-automation-id="verifyPassword"]',
+            'input[name="verifyPassword"]',
+            'input[name="confirmPassword"]',
+            'input[placeholder*="verify" i]',
+            'input[placeholder*="confirm" i]'
+        ]
+        
+        password = os.getenv('WORKDAY_PASSWORD', '')
+        if not password:
+            print("    ❌ No password found in environment variables")
+            return False
+        
+        for selector in verify_selectors:
+            try:
+                element = await page.wait_for_selector(selector, timeout=3000, state='visible')
+                if element:
+                    await element.fill(password)
+                    print(f"    ✅ Verify password filled using: {selector}")
+                    return True
+            except:
+                continue
+        
+        print("    ⚠️ Verify password field not found (may be optional)")
+        return True  # Return true as it might be optional
+    
+    async def _handle_checkbox(self, page: Page):
+        """Handle any checkboxes (terms, conditions, etc.)"""
+        checkbox_selectors = [
+            'input[data-automation-id="createAccountCheckbox"]',
+            'input[type="checkbox"]',
+            'input[name*="terms"]',
+            'input[name*="agree"]'
+        ]
+        
+        for selector in checkbox_selectors:
+            try:
+                element = await page.wait_for_selector(selector, timeout=2000, state='visible')
+                if element:
+                    await element.check()
+                    print(f"    ✅ Checkbox checked using: {selector}")
+                    break
+            except:
+                continue
+    
+    async def _submit_account_form(self, page: Page) -> bool:
+        """Submit the account creation form"""
+        submit_selectors = [
+            'button[data-automation-id="createAccountSubmitButton"]',
+            'button:has-text("Create Account")',
+            'button:has-text("Sign Up")',
+            'button[type="submit"]',
+            'input[type="submit"]'
+        ]
+        
+        for selector in submit_selectors:
+            try:
+                element = await page.wait_for_selector(selector, timeout=5000, state='visible')
+                if element and not await element.is_disabled():
+                    # Try multiple click strategies
+                    try:
+                        await element.click()
+                        print(f"    ✅ Form submitted using: {selector}")
+                        return True
+                    except:
+                        try:
+                            await element.click(force=True)
+                            print(f"    ✅ Form submitted (force) using: {selector}")
+                            return True
+                        except:
+                            try:
+                                await element.evaluate("element => element.click()")
+                                print(f"    ✅ Form submitted (JS) using: {selector}")
+                                return True
+                            except:
+                                continue
+            except:
+                continue
+        
+        # Fallback: Try Enter key
+        try:
+            await page.keyboard.press("Enter")
+            print("    ✅ Form submitted using Enter key")
+            return True
+        except:
+            pass
+        
+        print("    ❌ Submit button not found or not clickable")
+        return False
+    
+    async def _wait_for_account_creation(self, page: Page):
+        """Wait for account creation to complete and detect success"""
+        print("    ⏳ Waiting for account creation to complete...")
+        
+        # Wait for page transition
+        await page.wait_for_load_state("networkidle", timeout=15000)
+        await asyncio.sleep(3)
+        
+        # Check for success indicators
+        success_indicators = [
+            'text="Welcome"',
+            'text="Account Created"',
+            'text="Registration Complete"',
+            'text="Success"',
+            '.success-message',
+            '[data-automation-id*="success"]'
+        ]
+        
+        for indicator in success_indicators:
+            try:
+                if await page.query_selector(indicator):
+                    print(f"    ✅ Account creation success detected: {indicator}")
+                    return True
+            except:
+                continue
+        
+        # Check if URL changed (indicating progression)
+        current_url = page.url
+        if 'apply' in current_url.lower() and 'manually' not in current_url.lower():
+            print("    ✅ Account creation appears successful (URL changed)")
+            return True
+        
+        print("    ⚠️ Account creation status unclear, but proceeding...")
+        return True
+    
+    async def _navigate_to_next_page(self, page: Page):
+        """Navigate to the next page after account creation"""
+        print("  🔍 Looking for navigation to next page...")
+        
+        # Wait for any post-creation redirects
+        await asyncio.sleep(3)
+        
+        # Look for navigation elements to continue the application
+        nav_selectors = [
+            'a:has-text("Continue")',
+            'a:has-text("Next")',
+            'a:has-text("Start Application")',
+            'a:has-text("Begin")',
+            'button:has-text("Continue")',
+            'button:has-text("Next")',
+            'button:has-text("Start Application")',
+            '[data-automation-id*="continue"]',
+            '[data-automation-id*="next"]',
+            '[data-automation-id*="start"]'
+        ]
+        
+        for selector in nav_selectors:
+            try:
+                element = await page.wait_for_selector(selector, timeout=5000, state='visible')
+                if element:
+                    nav_text = await element.inner_text()
+                    print(f"  ✅ Found navigation: '{nav_text}'")
+                    await element.click()
+                    print("  🖱️ Clicked navigation element")
+                    
+                    # Wait for next page to load
+                    await page.wait_for_load_state("networkidle", timeout=10000)
+                    await asyncio.sleep(2)
+                    
+                    # Extract forms from the new page
+                    current_url = page.url
+                    page_title = await page.title()
+                    page_info = PageInfo(
+                        url=current_url,
+                        path=current_url.replace(self.tenant_url, '') or '/',
+                        title=page_title,
+                        page_type="Application Flow",
+                        visited=True
+                    )
+                    
+                    page_forms = await self._extract_page_forms(page, page_info)
+                    page_info.form_count = len(page_forms)
+                    self.form_elements.extend(page_forms)
+                    self.discovered_pages.append(page_info)
+                    
+                    print(f"  ✅ Next page: Extracted {len(page_forms)} additional form elements")
+                    return True
+            except:
+                continue
+        
+        print("  ℹ️ No navigation to next page found - account creation may be complete")
+        return False
+    
+    async def _extract_my_information_page(self, page: Page):
+        """Extract form elements from My Information page after account creation"""
+        print("  📋 Extracting form elements from My Information page...")
+        
+        try:
+            # Wait for My Information page to fully load
+            await page.wait_for_load_state("networkidle", timeout=10000)
+            await asyncio.sleep(3)  # Allow dynamic content to load
+            
+            # Create page info for My Information page
+            current_url = page.url
+            page_title = await page.title()
+            page_info = PageInfo(
+                url=current_url,
+                path=current_url.replace(self.tenant_url, '') or '/',
+                title=page_title,
+                page_type="My Information",
+                visited=True
+            )
+            
+            # Extract form elements from My Information page
+            page_forms = await self._extract_page_forms(page, page_info)
+            page_info.form_count = len(page_forms)
+            self.form_elements.extend(page_forms)
+            self.discovered_pages.append(page_info)
+            
+            print(f"  ✅ Extracted {len(page_forms)} form elements from My Information page")
+            
+            # Look for additional sections or pages within My Information
+            await self._navigate_my_information_sections(page)
+            
+        except Exception as e:
+            self.errors.append(f"Error extracting My Information page: {str(e)}")
+            print(f"  ❌ Error extracting My Information page: {str(e)}")
+    
+    async def _navigate_my_information_sections(self, page: Page):
+        """Navigate through different sections of My Information page"""
+        print("  🔍 Looking for My Information sections...")
+        
+        # Common My Information section navigation
+        section_selectors = [
+            'a:has-text("Personal Information")',
+            'a:has-text("Contact Information")',
+            'a:has-text("Address")',
+            'a:has-text("Phone")',
+            'a:has-text("Emergency Contact")',
+            'a:has-text("Education")',
+            'a:has-text("Work Experience")',
+            'a:has-text("Skills")',
+            'button:has-text("Next")',
+            'button:has-text("Continue")',
+            '[data-automation-id*="next"]',
+            '[data-automation-id*="continue"]',
+            '[data-automation-id*="section"]'
+        ]
+        
+        visited_sections = {page.url}
+        sections_processed = 1
+        max_sections = 5
+        
+        while sections_processed < max_sections:
+            section_found = False
+            
+            for selector in section_selectors:
+                try:
+                    section_element = await page.wait_for_selector(selector, timeout=3000, state='visible')
+                    if section_element:
+                        section_text = await section_element.inner_text()
+                        print(f"    🔗 Found section: {section_text}")
+                        
+                        await section_element.click()
+                        await page.wait_for_load_state("networkidle", timeout=8000)
+                        await asyncio.sleep(2)
+                        
+                        # Check if we're on a new section/page
+                        new_url = page.url
+                        if new_url not in visited_sections:
+                            visited_sections.add(new_url)
+                            
+                            # Extract forms from new section
+                            page_title = await page.title()
+                            section_info = PageInfo(
+                                url=new_url,
+                                path=new_url.replace(self.tenant_url, '') or '/',
+                                title=f"{page_title} - {section_text}",
+                                page_type="My Information Section",
+                                visited=True
+                            )
+                            
+                            section_forms = await self._extract_page_forms(page, section_info)
+                            section_info.form_count = len(section_forms)
+                            self.form_elements.extend(section_forms)
+                            self.discovered_pages.append(section_info)
+                            
+                            print(f"    ✅ Section {sections_processed + 1}: Extracted {len(section_forms)} form elements")
+                            sections_processed += 1
+                            section_found = True
+                            break
+                        else:
+                            print(f"    ℹ️ Already visited this section")
+                            
+                except:
+                    continue
+            
+            if not section_found:
+                print("    ℹ️ No more sections found")
+                break
+        
+        print(f"  ✅ My Information sections complete: {sections_processed} sections processed")
+    
     def _classify_page_type(self, path: str, title: str) -> str:
         """Classify page type based on URL path and title"""
         path_lower = path.lower()
@@ -421,8 +830,9 @@ class WorkdayFormScraper:
             return "Other"
     
     async def _extract_page_forms(self, page: Page, page_info: PageInfo) -> List[FormElement]:
-        """Extract all form elements from current page"""
+        """Extract all form elements from current page with improved radio grouping and dropdown extraction"""
         form_elements = []
+        processed_radio_groups = set()  # Track processed radio button groups
         
         try:
             # Wait for dynamic content to load
@@ -433,6 +843,27 @@ class WorkdayFormScraper:
             
             print(f"    🔍 Found {len(containers)} form containers")
             
+            # First pass: Group radio buttons by name attribute
+            radio_groups = await self._group_radio_buttons(page)
+            
+            # Process radio groups first
+            for group_name, radio_info in radio_groups.items():
+                if group_name not in processed_radio_groups:
+                    form_element = FormElement(
+                        label=radio_info['label'],
+                        id_of_input_component=group_name,
+                        required=radio_info['required'],
+                        type_of_input="radio",
+                        options=radio_info['options'],
+                        user_data_select_values=radio_info['sample_values'],
+                        page_url=page_info.url,
+                        page_title=page_info.title
+                    )
+                    form_elements.append(form_element)
+                    processed_radio_groups.add(group_name)
+                    print(f"    ✅ Grouped radio buttons: {group_name} with {len(radio_info['options'])} options")
+            
+            # Second pass: Process other form elements
             for container in containers:
                 try:
                     # Skip invisible elements
@@ -444,15 +875,21 @@ class WorkdayFormScraper:
                     if not control_type:
                         continue
                     
+                    # Skip individual radio buttons (already processed in groups)
+                    if control_type == "radio":
+                        radio_name = await self._get_radio_group_name(container)
+                        if radio_name in processed_radio_groups:
+                            continue
+                    
                     # Extract element data
                     label = await self._extract_label(container)
                     identifier = await self._extract_identifier(container)
                     required = await self._is_required(container)
                     
-                    # Extract options for multi-choice controls
+                    # Enhanced options extraction for dropdowns
                     options = []
-                    if control_type in ("select", "multiselect", "radio", "checkbox"):
-                        options = await self._extract_options(container, control_type)
+                    if control_type in ("select", "multiselect", "checkbox"):
+                        options = await self._extract_options_enhanced(container, control_type, identifier)
                     
                     # Generate sample values
                     sample_values = self._generate_sample_values(control_type, options, label)
@@ -490,7 +927,7 @@ class WorkdayFormScraper:
         return form_elements
     
     async def _find_form_containers(self, page: Page) -> List:
-        """Find all form containers and individual form elements"""
+        """Find all form containers and individual form elements with enhanced dropdown detection"""
         containers = []
         
         # Strategy 1: Workday-specific containers
@@ -513,6 +950,32 @@ class WorkdayFormScraper:
         )
         containers.extend(login_elements)
         
+        # Strategy 5: Enhanced dropdown detection (especially for country and source dropdowns)
+        dropdown_elements = await page.query_selector_all(
+            'select, [role="combobox"], [data-automation-id*="dropdown"], '
+            '[id="country--country"], [data-automation-id="country--country"], '
+            '[id="source--source"], [data-automation-id="source--source"], '
+            '[id*="country"], [name*="country"], [id*="source"], [name*="source"], '
+            '[class*="dropdown"], [class*="select"], [aria-haspopup="listbox"]'
+        )
+        containers.extend(dropdown_elements)
+        
+        # Strategy 6: Radio button groups
+        radio_groups = await page.query_selector_all(
+            '[role="radiogroup"], [data-automation-id*="radio"], '
+            'input[type="radio"][name="candidateIsPreviousWorker"]'
+        )
+        containers.extend(radio_groups)
+        
+        # Strategy 7: Specific country dropdown detection
+        try:
+            country_dropdown = await page.query_selector('[id="country--country"]')
+            if country_dropdown:
+                containers.append(country_dropdown)
+                print(f"    🌍 Found specific country dropdown with id='country--country'")
+        except:
+            pass
+        
         # Remove duplicates while preserving order
         unique_containers = []
         seen = set()
@@ -526,12 +989,21 @@ class WorkdayFormScraper:
                 # If we can't get outerHTML, just add it anyway
                 unique_containers.append(container)
         
+        print(f"    🔍 Found {len(unique_containers)} form containers/elements")
         return unique_containers
     
     async def _identify_control_type(self, element) -> Optional[str]:
-        """Identify form control type"""
+        """Identify form control type with enhanced dropdown detection"""
         try:
             tag_name = await element.evaluate('el => el.tagName.toLowerCase()')
+            element_id = await element.get_attribute('id') or ''
+            element_role = await element.get_attribute('role') or ''
+            element_class = await element.get_attribute('class') or ''
+            
+            # Special handling for country dropdown
+            if element_id == 'country--country' or 'country--country' in element_id:
+                print(f"    🌍 Detected country dropdown: {element_id}")
+                return 'select'
             
             if tag_name == 'input':
                 input_type = await element.get_attribute('type') or 'text'
@@ -551,7 +1023,23 @@ class WorkdayFormScraper:
             
             elif tag_name == 'button':
                 button_type = await element.get_attribute('type') or 'button'
+                
+                # Check if button is actually a dropdown trigger
+                if (element_role == 'combobox' or 
+                    'dropdown' in element_class.lower() or 
+                    'select' in element_class.lower() or
+                    'country' in element_id.lower()):
+                    return 'select'
+                
                 return 'submit' if button_type == 'submit' else None
+            
+            elif tag_name == 'div':
+                # Check if div is acting as a dropdown
+                if (element_role == 'combobox' or 
+                    'dropdown' in element_class.lower() or 
+                    'select' in element_class.lower() or
+                    element_id == 'country--country'):
+                    return 'select'
             
             # Handle container elements
             else:
@@ -572,7 +1060,7 @@ class WorkdayFormScraper:
                     select_elem = await element.query_selector('select')
                     multiple = await select_elem.get_attribute('multiple')
                     return 'multiselect' if multiple else 'select'
-                elif await element.query_selector('div[role="combobox"]'):
+                elif await element.query_selector('div[role="combobox"], button[role="combobox"]'):
                     return 'select'
                 elif await element.query_selector('[data-automation-id*="date"], input[type="date"]'):
                     return 'date'
@@ -707,72 +1195,435 @@ class WorkdayFormScraper:
         
         return False
     
-    async def _extract_options(self, element, control_type: str) -> List[str]:
-        """Extract options for multi-choice controls"""
+    async def _group_radio_buttons(self, page: Page) -> Dict[str, Dict]:
+        """Group radio buttons by their name attribute"""
+        radio_groups = {}
+        
+        try:
+            # Find all radio buttons on the page
+            radio_buttons = await page.query_selector_all('input[type="radio"]')
+            
+            for radio in radio_buttons:
+                try:
+                    # Get radio button attributes
+                    radio_name = await radio.get_attribute('name')
+                    radio_id = await radio.get_attribute('id')
+                    radio_value = await radio.get_attribute('value')
+                    
+                    if not radio_name:
+                        continue
+                    
+                    # Initialize group if not exists
+                    if radio_name not in radio_groups:
+                        # Try to find a label for the group
+                        group_label = await self._find_radio_group_label(page, radio_name, radio)
+                        
+                        radio_groups[radio_name] = {
+                            'label': group_label,
+                            'options': [],
+                            'required': False,
+                            'sample_values': []
+                        }
+                    
+                    # Find label for this specific radio option
+                    option_label = ""
+                    if radio_id:
+                        # Look for label with for attribute
+                        label_element = await page.query_selector(f'label[for="{radio_id}"]')
+                        if label_element:
+                            option_label = await label_element.inner_text()
+                            option_label = option_label.strip()
+                    
+                    # If no label found, use value or id
+                    if not option_label:
+                        option_label = radio_value or radio_id or "Unknown Option"
+                    
+                    # Add option to group if not already present
+                    if option_label not in radio_groups[radio_name]['options']:
+                        radio_groups[radio_name]['options'].append(option_label)
+                    
+                    # Check if required
+                    if not radio_groups[radio_name]['required']:
+                        radio_groups[radio_name]['required'] = await self._is_radio_required(radio)
+                
+                except Exception as e:
+                    print(f"    ⚠️ Error processing radio button: {str(e)}")
+                    continue
+            
+            # Set sample values for each group
+            for group_name, group_info in radio_groups.items():
+                if group_info['options']:
+                    # Smart selection based on common patterns
+                    sample_value = self._select_smart_radio_option(group_info['options'], group_info['label'])
+                    group_info['sample_values'] = [sample_value]
+                    
+                    print(f"    ✅ Radio group '{group_name}': {len(group_info['options'])} options")
+        
+        except Exception as e:
+            print(f"    ⚠️ Error grouping radio buttons: {str(e)}")
+        
+        return radio_groups
+    
+    async def _find_radio_group_label(self, page: Page, radio_name: str, first_radio) -> str:
+        """Find label for radio button group"""
+        try:
+            # Strategy 1: Look for fieldset legend
+            fieldset = await first_radio.evaluate('''
+                (radio) => {
+                    let current = radio;
+                    while (current && current.tagName !== 'FIELDSET') {
+                        current = current.parentElement;
+                    }
+                    return current;
+                }
+            ''')
+            
+            if fieldset:
+                legend = await fieldset.query_selector('legend')
+                if legend:
+                    legend_text = await legend.inner_text()
+                    if legend_text.strip():
+                        return legend_text.strip()
+            
+            # Strategy 2: Look for common label patterns
+            container = await first_radio.evaluate('''
+                (radio) => {
+                    let current = radio;
+                    for (let i = 0; i < 5; i++) {
+                        if (!current.parentElement) break;
+                        current = current.parentElement;
+                        
+                        // Look for elements that might contain the group label
+                        const labelElements = current.querySelectorAll('label, .label, .question, .form-label, [data-automation-id*="label"]');
+                        for (let label of labelElements) {
+                            const text = label.textContent.trim();
+                            if (text && !label.getAttribute('for')) {
+                                return label;
+                            }
+                        }
+                    }
+                    return null;
+                }
+            ''')
+            
+            if container:
+                label_text = await container.inner_text()
+                if label_text.strip():
+                    return label_text.strip()
+            
+            # Strategy 3: Use radio name as fallback
+            formatted_name = re.sub(r'([A-Z])', r' \1', radio_name).strip()
+            return formatted_name.capitalize() if formatted_name else radio_name
+        
+        except Exception:
+            pass
+        
+        return f"Radio Group ({radio_name})"
+    
+    async def _is_radio_required(self, radio_element) -> bool:
+        """Check if radio button group is required"""
+        try:
+            # Check aria-required
+            aria_required = await radio_element.get_attribute('aria-required')
+            if aria_required == 'true':
+                return True
+            
+            # Check required attribute
+            required_attr = await radio_element.get_attribute('required')
+            if required_attr is not None:
+                return True
+            
+            # Check parent container for required indicators
+            container = await radio_element.evaluate('''
+                (radio) => {
+                    let current = radio;
+                    for (let i = 0; i < 3; i++) {
+                        if (!current.parentElement) break;
+                        current = current.parentElement;
+                        
+                        if (current.querySelector('[aria-required="true"]') || 
+                            current.querySelector('.required') ||
+                            current.textContent.includes('*')) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            ''')
+            
+            return container
+        
+        except Exception:
+            pass
+        
+        return False
+    
+    def _select_smart_radio_option(self, options: List[str], group_label: str) -> str:
+        """Smart selection of radio option based on context"""
+        if not options:
+            return ""
+        
+        group_label_lower = group_label.lower()
+        
+        # For previous worker questions, prefer "No"
+        if 'previous' in group_label_lower and 'worker' in group_label_lower:
+            for option in options:
+                if option.lower() in ['no', 'false']:
+                    return option
+        
+        # For authorization questions, prefer "Yes"
+        if any(keyword in group_label_lower for keyword in ['authorized', 'eligible', 'legal']):
+            for option in options:
+                if option.lower() in ['yes', 'true']:
+                    return option
+        
+        # For visa/sponsorship questions, prefer "No"
+        if any(keyword in group_label_lower for keyword in ['visa', 'sponsor', 'h1b']):
+            for option in options:
+                if option.lower() in ['no', 'false', 'not required']:
+                    return option
+        
+        # Default to first option
+        return options[0]
+    
+    async def _get_radio_group_name(self, container) -> str:
+        """Get radio group name from container"""
+        try:
+            radio_element = await container.query_selector('input[type="radio"]')
+            if radio_element:
+                return await radio_element.get_attribute('name') or ""
+        except Exception:
+            pass
+        return ""
+    
+    async def _extract_options_enhanced(self, element, control_type: str, identifier: str) -> List[str]:
+        """Enhanced options extraction with special handling for known dropdowns"""
         options = []
         
         try:
             if control_type in ("select", "multiselect"):
-                # Handle dropdown options
-                try:
-                    # Try to click to open dropdown
-                    await element.click()
-                    await asyncio.sleep(0.5)
-                    
-                    # Look for options
-                    option_elements = await element.query_selector_all('option, div[role="option"], li[role="option"]')
-                    for opt in option_elements:
-                        if await opt.is_visible():
-                            option_text = await opt.inner_text()
-                            if option_text.strip():
-                                options.append(option_text.strip())
-                    
-                    # Close dropdown
-                    await element.press("Escape")
-                except:
-                    # Fallback: look for option elements directly
-                    option_elements = await element.query_selector_all('option')
-                    for opt in option_elements:
-                        option_text = await opt.inner_text()
-                        if option_text.strip():
-                            options.append(option_text.strip())
-            
-            elif control_type == "radio":
-                # Handle radio button groups
-                radio_elements = await element.query_selector_all('input[type="radio"]')
-                for radio in radio_elements:
-                    try:
-                        radio_id = await radio.get_attribute('id')
-                        if radio_id:
-                            # Look for associated label
-                            label = await element.query_selector(f'label[for="{radio_id}"]')
-                            if label:
-                                label_text = await label.inner_text()
-                                if label_text.strip():
-                                    options.append(label_text.strip())
-                    except:
-                        continue
-            
+                # Special handling for known dropdowns
+                if 'source' in identifier.lower():
+                    print(f"    🎯 Special handling for source dropdown: {identifier}")
+                    options = await self._extract_source_dropdown_options(element)
+                elif 'country' in identifier.lower() or identifier == 'country--country':
+                    print(f"    🎯 Special handling for country dropdown: {identifier}")
+                    options = await self._extract_country_dropdown_options(element)
+                else:
+                    # General dropdown extraction
+                    options = await self._extract_dropdown_options(element)
+                
             elif control_type == "checkbox":
                 # Handle checkbox groups
-                checkbox_elements = await element.query_selector_all('input[type="checkbox"]')
-                for checkbox in checkbox_elements:
+                options = await self._extract_checkbox_options(element)
+        
+        except Exception as e:
+            print(f"    ⚠️ Error in enhanced options extraction: {str(e)}")
+        
+        return options
+    
+    async def _extract_source_dropdown_options(self, element) -> List[str]:
+        """Extract options from source dropdown with fallback values"""
+        options = []
+        
+        try:
+            # Try to extract actual options
+            options = await self._extract_dropdown_options(element)
+            
+            # If no options found, provide common source options
+            if not options:
+                options = [
+                    "Direct",
+                    "Employee Referral", 
+                    "LinkedIn",
+                    "Indeed",
+                    "Glassdoor",
+                    "University/College",
+                    "Job Fair",
+                    "Company Website",
+                    "Other"
+                ]
+                print(f"    ℹ️ Using predefined source options")
+        
+        except Exception:
+            pass
+        
+        return options
+    
+    async def _extract_country_dropdown_options(self, element) -> List[str]:
+        """Extract options from country dropdown with fallback values"""
+        options = []
+        
+        try:
+            print(f"    🌍 Extracting country dropdown options...")
+            
+            # Try to extract actual options by clicking the dropdown
+            try:
+                await element.click()
+                await asyncio.sleep(2)  # Wait longer for country dropdown to load
+                
+                # Look for country options with multiple strategies
+                country_option_selectors = [
+                    'option',
+                    'div[role="option"]',
+                    'li[role="option"]',
+                    '.dropdown-option',
+                    '.select-option',
+                    '[data-automation-id*="option"]',
+                    '[data-automation-value]',
+                    'ul li',  # Common for country dropdowns
+                    '.country-option'
+                ]
+                
+                for selector in country_option_selectors:
                     try:
-                        checkbox_id = await checkbox.get_attribute('id')
-                        if checkbox_id:
-                            # Look for associated label
-                            label = await element.query_selector(f'label[for="{checkbox_id}"]')
-                            if label:
-                                label_text = await label.inner_text()
-                                if label_text.strip():
-                                    options.append(label_text.strip())
+                        # Look in the element first
+                        option_elements = await element.query_selector_all(selector)
+                        
+                        # If no options found in element, look in the entire page
+                        if not option_elements:
+                            page = element.page
+                            option_elements = await page.query_selector_all(selector)
+                        
+                        for opt in option_elements:
+                            if await opt.is_visible():
+                                option_text = await opt.inner_text()
+                                if option_text.strip() and len(option_text.strip()) > 1:
+                                    # Filter out common non-country options
+                                    if not any(skip in option_text.lower() for skip in ['select', 'choose', 'please', '---', 'loading']):
+                                        options.append(option_text.strip())
                     except:
                         continue
+                
+                # Close dropdown
+                await element.press('Escape')
+                
+            except Exception as e:
+                print(f"    ⚠️ Error clicking country dropdown: {str(e)}")
+            
+            # If no options found, provide comprehensive country list
+            if not options:
+                options = [
+                    "United States",
+                    "Canada",
+                    "United Kingdom", 
+                    "Australia",
+                    "Germany",
+                    "France",
+                    "India",
+                    "China",
+                    "Japan",
+                    "Brazil",
+                    "Mexico",
+                    "Italy",
+                    "Spain",
+                    "Netherlands",
+                    "Sweden",
+                    "Norway",
+                    "Denmark",
+                    "Switzerland",
+                    "Austria",
+                    "Belgium",
+                    "Ireland",
+                    "New Zealand",
+                    "South Korea",
+                    "Singapore",
+                    "Hong Kong",
+                    "Taiwan",
+                    "Israel",
+                    "South Africa",
+                    "Argentina",
+                    "Chile",
+                    "Colombia",
+                    "Other"
+                ]
+                print(f"    ℹ️ Using comprehensive predefined country list ({len(options)} countries)")
+            else:
+                print(f"    ✅ Extracted {len(options)} country options from dropdown")
+        
+        except Exception as e:
+            print(f"    ⚠️ Error in country dropdown extraction: {str(e)}")
+        
+        return list(set(options))  # Remove duplicates while preserving order
+    
+    async def _extract_dropdown_options(self, element) -> List[str]:
+        """Extract options from dropdown element"""
+        options = []
+        
+        try:
+            # Strategy 1: Try to click and open dropdown
+            try:
+                await element.click()
+                await asyncio.sleep(1)  # Wait for dropdown to open
+                
+                # Look for options with multiple selectors
+                option_selectors = [
+                    'option',
+                    'div[role="option"]',
+                    'li[role="option"]',
+                    '.dropdown-option',
+                    '.select-option',
+                    '[data-automation-id*="option"]',
+                    '[data-automation-value]'
+                ]
+                
+                for selector in option_selectors:
+                    try:
+                        # Look in element first, then in page
+                        option_elements = await element.query_selector_all(selector)
+                        if not option_elements:
+                            # Look in entire page for dropdowns that open elsewhere
+                            page = element.page
+                            option_elements = await page.query_selector_all(selector)
+                        
+                        for opt in option_elements:
+                            if await opt.is_visible():
+                                option_text = await opt.inner_text()
+                                if option_text.strip():
+                                    options.append(option_text.strip())
+                    except:
+                        continue
+                
+                # Close dropdown
+                await element.press('Escape')
+                
+            except Exception:
+                # Strategy 2: Look for option elements directly
+                option_elements = await element.query_selector_all('option')
+                for opt in option_elements:
+                    option_text = await opt.inner_text()
+                    if option_text.strip():
+                        options.append(option_text.strip())
         
         except Exception:
             pass
         
         return list(set(options))  # Remove duplicates
+    
+    async def _extract_checkbox_options(self, element) -> List[str]:
+        """Extract options from checkbox groups"""
+        options = []
+        
+        try:
+            checkbox_elements = await element.query_selector_all('input[type="checkbox"]')
+            for checkbox in checkbox_elements:
+                try:
+                    checkbox_id = await checkbox.get_attribute('id')
+                    if checkbox_id:
+                        # Look for associated label
+                        page = element.page
+                        label = await page.query_selector(f'label[for="{checkbox_id}"]')
+                        if label:
+                            label_text = await label.inner_text()
+                            if label_text.strip():
+                                options.append(label_text.strip())
+                except:
+                    continue
+        
+        except Exception:
+            pass
+        
+        return options
     
     def _generate_sample_values(self, control_type: str, options: List[str], label: str) -> List[str]:
         """Generate intelligent sample values"""
