@@ -1,0 +1,50 @@
+[
+  {
+    "label": "Unlabeled Field",
+    "id_of_input_component": "email",
+    "required": true,
+    "type_of_input": "text",
+    "options": [],
+    "user_data_select_values": []
+  },
+  {
+    "label": "Unlabeled Field",
+    "id_of_input_component": "password",
+    "required": true,
+    "type_of_input": "password",
+    "options": [],
+    "user_data_select_values": []
+  },
+  {
+    "label": "Unlabeled Field",
+    "id_of_input_component": "verifyPassword",
+    "required": true,
+    "type_of_input": "password",
+    "options": [],
+    "user_data_select_values": []
+  },
+  {
+    "label": "Unlabeled Field",
+    "id_of_input_component": "createAccountCheckbox",
+    "required": false,
+    "type_of_input": "checkbox",
+    "options": [],
+    "user_data_select_values": []
+  },
+  {
+    "label": "Unlabeled Field",
+    "id_of_input_component": "createAccountSubmitButton",
+    "required": false,
+    "type_of_input": "submit",
+    "options": [],
+    "user_data_select_values": []
+  },
+  {
+    "label": "Unlabeled Field",
+    "id_of_input_component": "beecatcher",
+    "required": false,
+    "type_of_input": "text",
+    "options": [],
+    "user_data_select_values": []
+  }
+]
