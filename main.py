@@ -1475,59 +1475,134 @@ async def extract_form_elements(page):
 
 async def identify_control_type(element):
     """
-    Determines the type of form control using Workday-specific attributes.
-    Handles various UI patterns found in Workday applications.
+    Determines the type of form control for both containers and individual elements.
+    Handles various UI patterns found in Workday applications and generic forms.
     """
-    # Check for text inputs
-    if await element.query_selector('input[type="text"]'):
-        return "text"
+    # First check if this element itself is a form control (for direct elements)
+    tag_name = await element.evaluate('el => el.tagName.toLowerCase()')
     
-    # Check for textareas
-    if await element.query_selector('textarea'):
+    if tag_name == 'input':
+        input_type = await element.get_attribute('type') or 'text'
+        if input_type in ['text', 'email', 'tel', 'number', 'search']:
+            return "text"
+        elif input_type == 'password':
+            return "password"
+        elif input_type == 'file':
+            return "file"
+        elif input_type == 'checkbox':
+            return "checkbox"
+        elif input_type == 'radio':
+            return "radio"
+        elif input_type == 'submit':
+            return "submit"
+        elif input_type == 'button':
+            return "button"
+        elif input_type == 'date':
+            return "date"
+        else:
+            return "text"  # Default for unknown input types
+    
+    elif tag_name == 'textarea':
         return "textarea"
     
-    # Check for file inputs
-    if await element.query_selector('input[type="file"]'):
-        return "file"
+    elif tag_name == 'select':
+        # Check if it's a multi-select
+        multiple = await element.get_attribute('multiple')
+        return "multiselect" if multiple else "select"
     
-    # Check for dropdowns/comboboxes
-    combobox = await element.query_selector('div[role="combobox"]')
-    if combobox:
-        # Determine if multiselect or single select
-        if await combobox.get_attribute('aria-multiselectable') == "true":
-            return "multiselect"
-        
-        # Check for type-ahead functionality
-        input_inside = await combobox.query_selector('input[type="text"]')
-        if input_inside:
-            return "typeahead"
-        return "select"
+    elif tag_name == 'button':
+        button_type = await element.get_attribute('type') or 'button'
+        return "submit" if button_type == 'submit' else "button"
     
-    # Check for radio groups
-    if await element.query_selector('div[data-automation-id="radioButtonGroup"]'):
-        return "radio"
-    
-    # Check for checkboxes
-    if await element.query_selector('div[data-automation-id="checkboxGroup"]'):
-        return "checkbox"
-    
-    # Check for date pickers
-    if await element.query_selector('div[data-automation-id="dateWidget"]'):
-        return "date"
-    
-    # Check for date fields by label
-    label = await extract_label(element)
-    if label and any(term in label.lower() for term in ["date", "dob", "birth"]):
-        return "date"
-    
-    # Fallback to input type detection
-    input_elem = await element.query_selector('input')
-    if input_elem:
-        input_type = await input_elem.get_attribute('type')
-        if input_type in ["text", "email", "tel", "number"]:
+    # If it's not a direct form element, check for child elements (container approach)
+    else:
+        # Check for text inputs
+        if await element.query_selector('input[type="text"]'):
             return "text"
-        if input_type == "file":
+        
+        # Check for email inputs
+        if await element.query_selector('input[type="email"]'):
+            return "text"
+        
+        # Check for password inputs
+        if await element.query_selector('input[type="password"]'):
+            return "password"
+        
+        # Check for textareas
+        if await element.query_selector('textarea'):
+            return "textarea"
+        
+        # Check for file inputs
+        if await element.query_selector('input[type="file"]'):
             return "file"
+        
+        # Check for dropdowns/comboboxes
+        combobox = await element.query_selector('div[role="combobox"]')
+        if combobox:
+            # Determine if multiselect or single select
+            if await combobox.get_attribute('aria-multiselectable') == "true":
+                return "multiselect"
+            
+            # Check for type-ahead functionality
+            input_inside = await combobox.query_selector('input[type="text"]')
+            if input_inside:
+                return "typeahead"
+            return "select"
+        
+        # Check for select elements
+        if await element.query_selector('select'):
+            select_elem = await element.query_selector('select')
+            multiple = await select_elem.get_attribute('multiple')
+            return "multiselect" if multiple else "select"
+        
+        # Check for radio groups
+        if await element.query_selector('div[data-automation-id="radioButtonGroup"]'):
+            return "radio"
+        
+        # Check for individual radio buttons
+        if await element.query_selector('input[type="radio"]'):
+            return "radio"
+        
+        # Check for checkboxes
+        if await element.query_selector('div[data-automation-id="checkboxGroup"]'):
+            return "checkbox"
+        
+        # Check for individual checkboxes
+        if await element.query_selector('input[type="checkbox"]'):
+            return "checkbox"
+        
+        # Check for date pickers
+        if await element.query_selector('div[data-automation-id="dateWidget"]'):
+            return "date"
+        
+        # Check for date inputs
+        if await element.query_selector('input[type="date"]'):
+            return "date"
+        
+        # Check for submit buttons
+        if await element.query_selector('button[type="submit"]'):
+            return "submit"
+        
+        # Check for regular buttons
+        if await element.query_selector('button'):
+            return "button"
+        
+        # Check for date fields by label
+        try:
+            label = await extract_label(element)
+            if label and any(term in label.lower() for term in ["date", "dob", "birth"]):
+                return "date"
+        except:
+            pass
+        
+        # Final fallback to input type detection
+        input_elem = await element.query_selector('input')
+        if input_elem:
+            input_type = await input_elem.get_attribute('type')
+            if input_type in ["text", "email", "tel", "number"]:
+                return "text"
+            if input_type == "file":
+                return "file"
     
     return None
 
