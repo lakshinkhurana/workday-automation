@@ -1,0 +1,75 @@
+{
+  "extraction_metadata": {
+    "timestamp": "2025-07-23 03:00:42",
+    "tenant_url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite",
+    "total_pages_crawled": 1,
+    "total_form_elements": 7
+  },
+  "pages_visited": [
+    {
+      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-CA%2C-Santa-Clara/Senior-Physical-Design-Engineer_JR2000473/apply/applyManually",
+      "title": "Senior Physical Design Engineer",
+      "page_type": "Job Application",
+      "form_count": 7
+    }
+  ],
+  "form_elements": [
+    {
+      "label": "Email Address",
+      "id_of_input_component": "signInFormo",
+      "required": true,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "email",
+      "required": true,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "password",
+      "required": true,
+      "type_of_input": "password",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "verifyPassword",
+      "required": true,
+      "type_of_input": "password",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "createAccountCheckbox",
+      "required": false,
+      "type_of_input": "checkbox",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "createAccountSubmitButton",
+      "required": false,
+      "type_of_input": "submit",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "beecatcher",
+      "required": false,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    }
+  ],
+  "errors": []
+}
