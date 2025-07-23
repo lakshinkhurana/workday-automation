@@ -26,7 +26,7 @@ class DirectFormFiller:
             'phoneNumber--countryPhoneCode': '+1',
             'phoneNumber--extension': '',
             'country--country': 'United States',
-            'source--source': 'Company Website',
+            'source--source': 'vidyapeeth',
             'candidateIsPreviousWorker': 'No',  # Radio button for previous employee
             
             # Skip address fields as requested
@@ -111,6 +111,14 @@ class DirectFormFiller:
         """Fill a specific field by its id, data-automation-id, or name attributes"""
         
         print(f"    🔍 Attempting to fill field '{field_id}' with value '{value}'")
+        
+        # Special handling for dropdown fields that need typing + Enter
+        if field_id == 'source--source':
+            return await self._handle_dropdown_with_typing(page, field_id, value)
+        
+        # Special handling for phone device type dropdown
+        if field_id == 'phoneNumber--phoneDeviceType':
+            return await self._handle_phone_device_type_dropdown(page, field_id, value)
         
         try:
             # Strategy 1: Text input fields - comprehensive selector approach
@@ -274,40 +282,212 @@ class DirectFormFiller:
         
         return False
     
+    async def _handle_phone_device_type_dropdown(self, page, field_id: str, value: str) -> bool:
+        """Handle phone device type dropdown with button-based listbox structure"""
+        
+        print(f"      🔍 Handling phone device type dropdown for: {field_id}")
+        
+        try:
+            # Try different selectors for the button dropdown field
+            button_selectors = [
+                f'button[id="{field_id}"]',
+                f'button[id="phoneNumber--phoneType"]',  # Based on your structure
+                f'button[name="phoneType"]',
+                f'button[aria-haspopup="listbox"]',
+                f'button[id*="phoneType"]',
+                f'button[id*="phoneNumber--phoneType"]'
+            ]
+            
+            for selector in button_selectors:
+                try:
+                    print(f"        🔍 Trying phone device type button selector: {selector}")
+                    button_element = await page.query_selector(selector)
+                    if button_element and await button_element.is_visible():
+                        print(f"        ✅ Found phone device type button with selector: {selector}")
+                        
+                        # Click the button to open the dropdown
+                        await page.click(selector)
+                        await asyncio.sleep(1)  # Wait for dropdown to open
+                        print(f"        🖱️ Clicked phone device type button")
+                        
+                        # Look for the dropdown options that appear after clicking
+                        option_selectors = [
+                            f'li:has-text("{value}")',  # Look for list item with "Home"
+                            f'div:has-text("{value}")',  # Or div with "Home"
+                            f'span:has-text("{value}")',  # Or span with "Home"
+                            f'[role="option"]:has-text("{value}")',  # ARIA option with "Home"
+                            f'[role="listbox"] *:has-text("{value}")'  # Any element in listbox with "Home"
+                        ]
+                        
+                        for option_selector in option_selectors:
+                            try:
+                                print(f"        🔍 Looking for option with selector: {option_selector}")
+                                option_element = await page.wait_for_selector(option_selector, timeout=3000, state='visible')
+                                if option_element:
+                                    print(f"        ✅ Found '{value}' option with selector: {option_selector}")
+                                    await option_element.click()
+                                    await asyncio.sleep(0.5)
+                                    print(f"    ✅ Successfully selected '{value}' in phone device type dropdown")
+                                    return True
+                            except:
+                                continue
+                        
+                        # If specific option not found, try a more general approach
+                        print(f"        🔍 Trying general option selection...")
+                        try:
+                            # Wait for any dropdown options to appear
+                            await page.wait_for_selector('[role="listbox"], ul, .dropdown-menu', timeout=3000)
+                            
+                            # Click on any option containing "Home" (case insensitive)
+                            await page.click(f'text=/{value}/i')
+                            await asyncio.sleep(0.5)
+                            print(f"    ✅ Successfully selected '{value}' using general text selector")
+                            return True
+                        except:
+                            print(f"        ⚠️ Could not find '{value}' option in dropdown")
+                        
+                except Exception as e:
+                    print(f"        Error with phone device type button selector {selector}: {str(e)}")
+                    continue
+            
+            print(f"    ❌ Could not find phone device type dropdown button: {field_id}")
+            return False
+            
+        except Exception as e:
+            print(f"    ❌ Critical error handling phone device type dropdown {field_id}: {str(e)}")
+            return False
+    
+    async def _handle_dropdown_with_typing(self, page, field_id: str, value: str) -> bool:
+        """Handle dropdown fields that require typing + Enter"""
+        
+        print(f"      🔍 Handling dropdown with typing for: {field_id}")
+        
+        try:
+            # Try different selectors for the dropdown field
+            selectors = [
+                f'input[id="{field_id}"]',
+                f'input[data-automation-id="{field_id}"]',
+                f'input[name="{field_id}"]',
+                f'input[id*="{field_id}"]'
+            ]
+            
+            for selector in selectors:
+                try:
+                    print(f"        🔍 Trying dropdown selector: {selector}")
+                    element = await page.query_selector(selector)
+                    if element and await element.is_visible():
+                        print(f"        ✅ Found dropdown element with selector: {selector}")
+                        
+                        # Click to focus the field
+                        await page.click(selector)
+                        await asyncio.sleep(0.5)
+                        
+                        # Clear any existing value
+                        await page.fill(selector, '')
+                        await asyncio.sleep(0.5)
+                        
+                        # Type the value
+                        await page.type(selector, value)
+                        await asyncio.sleep(1)
+                        
+                        # Press Enter to select
+                        await page.keyboard.press('Enter')
+                        await asyncio.sleep(1)
+                        
+                        print(f"    ✅ Successfully filled dropdown '{field_id}' with '{value}' and pressed Enter")
+                        return True
+                        
+                except Exception as e:
+                    print(f"        Error with dropdown selector {selector}: {str(e)}")
+                    continue
+            
+            print(f"    ❌ Could not find dropdown field: {field_id}")
+            return False
+            
+        except Exception as e:
+            print(f"    ❌ Critical error handling dropdown {field_id}: {str(e)}")
+            return False
+    
     async def _handle_radio_by_id(self, page, field_id: str, value: str) -> bool:
         """Handle radio buttons by finding the correct option"""
         
         try:
+            print(f"        🔍 Looking for radio buttons for field: {field_id}")
+            
             # Find all radio buttons with this name/id
             radio_selectors = [
                 f'input[name="{field_id}"]',
+                f'input[id="{field_id}"]',  # Added id selector
                 f'input[data-automation-id="{field_id}"]'
             ]
             
             for selector in radio_selectors:
+                print(f"        🔍 Trying radio selector: {selector}")
                 radios = await page.query_selector_all(selector)
                 
                 if radios:
+                    print(f"        ✅ Found {len(radios)} radio buttons with selector: {selector}")
+                    
                     # Look for the specific value we want
+                    for i, radio in enumerate(radios):
+                        if await radio.is_visible():
+                            radio_value = await radio.get_attribute('value')
+                            radio_id = await radio.get_attribute('id')
+                            print(f"          Radio {i+1}: id='{radio_id}', value='{radio_value}'")
+                    
+                    # For candidateIsPreviousWorker, we want to select "No"
+                    if field_id == 'candidateIsPreviousWorker' and value.lower() == 'no':
+                        # Look for radio button with value containing "no" or "false"
+                        for radio in radios:
+                            if await radio.is_visible():
+                                radio_value = await radio.get_attribute('value')
+                                radio_id = await radio.get_attribute('id')
+                                
+                                # Check for "No" values (could be "No", "false", "0", etc.)
+                                if radio_value and (
+                                    radio_value.lower() == 'no' or 
+                                    radio_value.lower() == 'false' or 
+                                    radio_value == '0' or
+                                    'no' in radio_value.lower()
+                                ):
+                                    await page.check(f'#{radio_id}')
+                                    print(f"        ✅ Selected 'No' radio button: id='{radio_id}', value='{radio_value}'")
+                                    return True
+                        
+                        # If no clear "No" option found, select the second radio button (often "No")
+                        if len(radios) >= 2:
+                            second_radio = radios[1]  # Second option is often "No"
+                            radio_id = await second_radio.get_attribute('id')
+                            radio_value = await second_radio.get_attribute('value')
+                            await page.check(f'#{radio_id}')
+                            print(f"        ✅ Selected second radio option (assuming 'No'): id='{radio_id}', value='{radio_value}'")
+                            return True
+                    
+                    # General radio button handling for other fields
                     for radio in radios:
                         if await radio.is_visible():
                             radio_value = await radio.get_attribute('value')
+                            radio_id = await radio.get_attribute('id')
                             
                             # Exact match
                             if radio_value and radio_value.lower() == value.lower():
-                                await radio.check()
+                                await page.check(f'#{radio_id}')
+                                print(f"        ✅ Selected radio button with exact match: {radio_value}")
                                 return True
                             
                             # For Yes/No questions
                             if value.lower() == 'no' and radio_value and 'no' in radio_value.lower():
-                                await radio.check()
+                                await page.check(f'#{radio_id}')
+                                print(f"        ✅ Selected 'No' radio button: {radio_value}")
                                 return True
                             elif value.lower() == 'yes' and radio_value and 'yes' in radio_value.lower():
-                                await radio.check()
+                                await page.check(f'#{radio_id}')
+                                print(f"        ✅ Selected 'Yes' radio button: {radio_value}")
                                 return True
                     
-                    # If no exact match found, don't select anything for Yes/No questions
                     break
+                else:
+                    print(f"        ⚠️ No radio buttons found with selector: {selector}")
             
             return False
             
