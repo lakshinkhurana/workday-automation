@@ -11,11 +11,12 @@ import os
 import json
 import asyncio
 import time
+import re
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional, Tuple
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright, Page
-from workday_autofill import WorkdayAutoFill
+from direct_form_filler import DirectFormFiller
 
 # Load environment variables
 load_dotenv()
@@ -208,42 +209,8 @@ class WorkdayFormScraper:
         self.errors: List[str] = []
         self.tenant_url = os.getenv('WORKDAY_TENANT_URL', '')
         self.extracted_pages: set = set()  # Track pages we've already extracted from
-        self.autofill = WorkdayAutoFill()  # Initialize auto-fill functionality
         
-    def _map_form_fields(self, form_elements: List[FormElement]) -> List[FieldMapping]:
-        """Map extracted form fields to appropriate CV data from environment variables"""
-        field_mappings = []
-        
-        for form_element in form_elements:
-            field_id = form_element.id_of_input_component
-            field_type = form_element.type_of_input
-            
-            # Skip non-input elements
-            if field_type in ['submit', 'button']:
-                continue
-            
-            # Try exact match first
-            env_variable = FIELD_MAPPINGS.get(field_id)
-            
-            # If no exact match, try fuzzy matching
-            if not env_variable:
-                env_variable = self._fuzzy_match_field(field_id, form_element.label)
-            
-            if env_variable:
-                resolved_value = self._resolve_field_value(form_element, env_variable)
-                
-                field_mapping = FieldMapping(
-                    field_id=field_id,
-                    field_type=field_type,
-                    env_variable=env_variable,
-                    resolved_value=resolved_value
-                )
-                field_mappings.append(field_mapping)
-                print(f"  📋 Mapped field '{field_id}' -> {env_variable} = '{resolved_value[:50]}...'")
-            else:
-                print(f"  ⚠️ No mapping found for field: {field_id} (label: {form_element.label})")
-        
-        return field_mappings
+
     
     def _fuzzy_match_field(self, field_id: str, field_label: str) -> Optional[str]:
         """Attempt fuzzy matching for field names that don't exactly match mapping keys"""
@@ -447,14 +414,15 @@ class WorkdayFormScraper:
                 account_success = await self._create_account(page)
                 
                 if account_success:
-                    print("  ✅ Account created successfully")
+                    print("  ✅ Account created successfully - waiting for automatic page navigation...")
                     
-                    # Phase 6: Navigate to next page after account creation
-                    print("\n📍 Phase 6: Navigating to Next Page")
-                    await self._navigate_to_next_page(page)
+                    # Wait for automatic page switch after account creation
+                    await asyncio.sleep(5)
+                    await page.wait_for_load_state("networkidle", timeout=10000)
+                    print("  ✅ Page navigation completed")
                     
-                    # Phase 7: Extract form elements from My Information page
-                    print("\n📍 Phase 7: Extracting My Information Page Elements")
+                    # Phase 6: Extract and fill My Information page (no manual navigation needed)
+                    print("\n📍 Phase 6: Processing My Information Page")
                     await self._extract_my_information_page(page)
                 else:
                     print("  ⚠️ Account creation failed, but continuing...")
@@ -986,67 +954,11 @@ class WorkdayFormScraper:
         print("    ⚠️ Account creation status unclear, but proceeding...")
         return True
     
-    async def _navigate_to_next_page(self, page: Page):
-        """Navigate to the next page after account creation"""
-        print("  🔍 Looking for navigation to next page...")
-        
-        # Wait for any post-creation redirects
-        await asyncio.sleep(3)
-        
-        # Look for navigation elements to continue the application
-        nav_selectors = [
-            'a:has-text("Continue")',
-            'a:has-text("Next")',
-            'a:has-text("Start Application")',
-            'a:has-text("Begin")',
-            'button:has-text("Continue")',
-            'button:has-text("Next")',
-            'button:has-text("Start Application")',
-            '[data-automation-id*="continue"]',
-            '[data-automation-id*="next"]',
-            '[data-automation-id*="start"]'
-        ]
-        
-        for selector in nav_selectors:
-            try:
-                element = await page.wait_for_selector(selector, timeout=5000, state='visible')
-                if element:
-                    nav_text = await element.inner_text()
-                    print(f"  ✅ Found navigation: '{nav_text}'")
-                    await element.click()
-                    print("  🖱️ Clicked navigation element")
-                    
-                    # Wait for next page to load
-                    await page.wait_for_load_state("networkidle", timeout=10000)
-                    await asyncio.sleep(2)
-                    
-                    # Extract forms from the new page
-                    current_url = page.url
-                    page_title = await page.title()
-                    page_info = PageInfo(
-                        url=current_url,
-                        path=current_url.replace(self.tenant_url, '') or '/',
-                        title=page_title,
-                        page_type="Application Flow",
-                        visited=True
-                    )
-                    
-                    page_forms = await self._extract_page_forms(page, page_info)
-                    page_info.form_count = len(page_forms)
-                    self.form_elements.extend(page_forms)
-                    self.discovered_pages.append(page_info)
-                    
-                    print(f"  ✅ Next page: Extracted {len(page_forms)} additional form elements")
-                    return True
-            except:
-                continue
-        
-        print("  ℹ️ No navigation to next page found - account creation may be complete")
-        return False
+
     
     async def _extract_my_information_page(self, page: Page):
-        """Extract form elements from My Information page after account creation"""
-        print("  📋 Extracting form elements from My Information page...")
+        """Extract and fill form elements on My Information page"""
+        print("  📋 Processing My Information page...")
         
         try:
             # Wait for My Information page to fully load
@@ -1056,9 +968,12 @@ class WorkdayFormScraper:
             # Create page info for My Information page
             current_url = page.url
             
-            # Check if we've already extracted from this page
-            if current_url in self.extracted_pages:
-                print(f"  ℹ️ Already extracted from this page: {current_url}")
+            # Check if we've already processed this specific page content by looking for unique page identifiers
+            page_identifier = await self._get_page_identifier(page)
+            
+            # Check if we've already processed this specific page content
+            if page_identifier in self.extracted_pages:
+                print(f"  ℹ️ Already processed this page content: {page_identifier}")
                 return
             
             page_title = await page.title()
@@ -1070,21 +985,593 @@ class WorkdayFormScraper:
                 visited=True
             )
             
-            # Extract form elements from My Information page
+            # Step 1: Extract form elements from My Information page
             page_forms = await self._extract_page_forms(page, page_info)
             page_info.form_count = len(page_forms)
             self.form_elements.extend(page_forms)
             self.discovered_pages.append(page_info)
-            self.extracted_pages.add(current_url)  # Mark as extracted
+            self.extracted_pages.add(page_identifier)  # Mark as processed
             
             print(f"  ✅ Extracted {len(page_forms)} form elements from My Information page")
+            
+            # Step 2: Fill all form fields with CV data using direct form filler
+            print("  🎯 Using direct form filler to identify and fill fields by data-automation-id...")
+            
+            # Use direct form filler - identifies input areas by data-automation-id
+            direct_filler = DirectFormFiller()
+            filled_count = await direct_filler.fill_page_by_automation_id(page)
+            print(f"  ✅ Direct filler completed: {filled_count} fields filled")
+            
+            # Submit the form using direct method
+            print("  🚀 Submitting My Information form...")
+            submit_success = await direct_filler.submit_form(page)
+            
+            if submit_success:
+                print("  ✅ My Information form submitted successfully")
+            else:
+                print("  ⚠️ Failed to submit My Information form")
             
             # Look for additional sections or pages within My Information
             await self._navigate_my_information_sections(page)
             
         except Exception as e:
-            self.errors.append(f"Error extracting My Information page: {str(e)}")
-            print(f"  ❌ Error extracting My Information page: {str(e)}")
+            self.errors.append(f"Error processing My Information page: {str(e)}")
+            print(f"  ❌ Error processing My Information page: {str(e)}")
+    
+
+    
+    def _get_field_value_for_my_info(self, field_id: str, field_type: str, form_element: FormElement) -> str:
+        """Get the appropriate value for a My Information field based on specific data-automation-id patterns"""
+        
+        # Exact field ID matching for Workday-specific patterns
+        field_mappings = {
+            # Name fields
+            'name--legalName--firstName': os.getenv('REGISTRATION_FIRST_NAME', ''),
+            'name--legalName--lastName': os.getenv('REGISTRATION_LAST_NAME', ''),
+            'name--preferredName--firstName': os.getenv('REGISTRATION_FIRST_NAME', ''),
+            'name--preferredName--lastName': os.getenv('REGISTRATION_LAST_NAME', ''),
+            
+            # Contact fields
+            'email': os.getenv('REGISTRATION_EMAIL', ''),
+            'emailAddress': os.getenv('REGISTRATION_EMAIL', ''),
+            'phoneNumber--phoneNumber': os.getenv('REGISTRATION_PHONE', ''),
+            'phoneNumber--countryPhoneCode': '+1',  # US country code
+            'phoneNumber--extension': '',  # Usually empty
+            
+            # Address fields
+            'address--addressLine1': '',  # We don't have specific street address
+            'address--addressLine2': '',  # Usually empty
+            'address--city': 'California',  # Extract city from LOCATION
+            'address--postalCode': '90210',  # We don't have specific postal code
+            'address--countryRegion': 'California',  # State/region
+            'country--country': 'United States',
+            
+            # Professional fields
+            'currentCompany': os.getenv('CURRENT_COMPANY', ''),
+            'currentRole': os.getenv('CURRENT_ROLE', ''),
+            'workExperience': os.getenv('YEARS_EXPERIENCE', ''),
+            'skills': os.getenv('PRIMARY_SKILLS', ''),
+            
+            # Education fields
+            'education--degree': os.getenv('EDUCATION_MASTERS', ''),
+            'education--university': 'University of California, Davis',
+            'education--graduationYear': '2023',
+            
+            # Source/referral fields
+            'source--source': 'Company Website',
+            'referralSource': 'Company Website',
+            'howDidYouHear': 'Company Website',
+            
+            # Previous worker question
+            'candidateIsPreviousWorker': 'No',
+            'previousWorker': 'No',
+            'workedHereBefore': 'No',
+            
+            # GitHub/Portfolio
+            'github': os.getenv('GITHUB_URL', ''),
+            'githubUrl': os.getenv('GITHUB_URL', ''),
+            'portfolio': os.getenv('GITHUB_URL', ''),
+            'website': os.getenv('GITHUB_URL', ''),
+            
+            # Emergency contact (if present)
+            'emergencyContact--name': '',
+            'emergencyContact--phone': '',
+            'emergencyContact--relationship': '',
+            
+            # Visa/Work authorization
+            'workAuthorization': 'Yes',
+            'visaStatus': 'US Citizen',
+            'requiresSponsorship': 'No'
+        }
+        
+        # Try exact match first
+        if field_id in field_mappings:
+            value = field_mappings[field_id]
+            print(f"    🎯 Exact match for '{field_id}': {value}")
+            return value
+        
+        # Fallback to pattern matching for fields not in exact mapping
+        field_id_lower = field_id.lower()
+        
+        # Name fields (fallback patterns)
+        if 'firstname' in field_id_lower or 'first_name' in field_id_lower:
+            return os.getenv('REGISTRATION_FIRST_NAME', '')
+        elif 'lastname' in field_id_lower or 'last_name' in field_id_lower:
+            return os.getenv('REGISTRATION_LAST_NAME', '')
+        
+        # Contact fields (fallback patterns)
+        elif 'email' in field_id_lower:
+            return os.getenv('REGISTRATION_EMAIL', '')
+        elif 'phone' in field_id_lower and 'country' not in field_id_lower:
+            return os.getenv('REGISTRATION_PHONE', '')
+        elif 'phone' in field_id_lower and 'country' in field_id_lower:
+            return '+1'  # US country code
+        
+        # Address fields (fallback patterns)
+        elif 'address' in field_id_lower and 'line1' in field_id_lower:
+            return ''  # We don't have specific street address
+        elif 'city' in field_id_lower:
+            return 'California'
+        elif 'country' in field_id_lower:
+            return 'United States'
+        elif 'state' in field_id_lower or 'region' in field_id_lower:
+            return 'California'
+        elif 'postal' in field_id_lower or 'zip' in field_id_lower:
+            return ''
+        
+        # Professional fields (fallback patterns)
+        elif 'company' in field_id_lower:
+            return os.getenv('CURRENT_COMPANY', '')
+        elif 'role' in field_id_lower or 'title' in field_id_lower:
+            return os.getenv('CURRENT_ROLE', '')
+        elif 'experience' in field_id_lower:
+            return os.getenv('YEARS_EXPERIENCE', '')
+        elif 'skill' in field_id_lower:
+            return os.getenv('PRIMARY_SKILLS', '')
+        
+        # Education fields (fallback patterns)
+        elif 'education' in field_id_lower or 'degree' in field_id_lower:
+            return os.getenv('EDUCATION_MASTERS', '')
+        elif 'university' in field_id_lower or 'school' in field_id_lower:
+            return 'University of California, Davis'
+        
+        # Source fields (fallback patterns)
+        elif 'source' in field_id_lower or 'referral' in field_id_lower:
+            return 'Company Website'
+        
+        # Previous worker (fallback patterns)
+        elif 'previous' in field_id_lower or 'worked' in field_id_lower:
+            return 'No'
+        
+        # Work authorization (fallback patterns)
+        elif 'authorization' in field_id_lower or 'visa' in field_id_lower:
+            return 'Yes' if 'authorization' in field_id_lower else 'US Citizen'
+        elif 'sponsor' in field_id_lower:
+            return 'No'
+        
+        print(f"    ⚠️ No mapping found for field: {field_id}")
+        return ''
+    
+    async def _fill_single_my_info_field(self, page: Page, field_id: str, field_type: str, value: str, options: List[str]) -> bool:
+        """Fill a single field on My Information page"""
+        if not value:
+            print(f"    ⚠️ Skipping field '{field_id}' - no value provided")
+            return False
+            
+        print(f"    🎯 Filling field '{field_id}' (type: {field_type}) with value: '{value}'")
+        
+        try:
+            if field_type in ['text', 'email', 'tel', 'password']:
+                return await self._fill_text_field_my_info(page, field_id, value)
+            elif field_type == 'select':
+                return await self._fill_dropdown_field_my_info(page, field_id, value, options)
+            elif field_type == 'radio':
+                return await self._fill_radio_field_my_info(page, field_id, value, options)
+            elif field_type == 'checkbox':
+                return await self._fill_checkbox_field_my_info(page, field_id, value)
+            else:
+                # Default to text field for unknown types
+                print(f"    ⚠️ Unknown field type '{field_type}', treating as text field")
+                return await self._fill_text_field_my_info(page, field_id, value)
+        except Exception as e:
+            print(f"    ❌ Error filling field {field_id}: {str(e)}")
+            return False
+    
+    async def _fill_text_field_my_info(self, page: Page, field_id: str, value: str) -> bool:
+        """Fill a text input field on My Information page"""
+        print(f"      🔍 Attempting to fill text field '{field_id}' with value '{value}'")
+        
+        selectors = [
+            f'input[data-automation-id="{field_id}"]',
+            f'input[id="{field_id}"]',
+            f'input[name="{field_id}"]',
+            f'textarea[data-automation-id="{field_id}"]',
+            f'textarea[id="{field_id}"]',
+            f'textarea[name="{field_id}"]'
+        ]
+        
+        for i, selector in enumerate(selectors):
+            try:
+                print(f"        🔍 Trying selector {i+1}: {selector}")
+                element = await page.wait_for_selector(selector, timeout=3000, state='visible')
+                if element:
+                    print(f"        ✅ Found element with selector: {selector}")
+                    
+                    # Check if element is enabled and interactable
+                    is_enabled = await element.is_enabled()
+                    is_visible = await element.is_visible()
+                    print(f"        📊 Element state - Enabled: {is_enabled}, Visible: {is_visible}")
+                    
+                    if is_enabled and is_visible:
+                        await element.clear()
+                        await asyncio.sleep(0.5)
+                        await element.fill(value)
+                        await asyncio.sleep(0.5)
+                        
+                        # Verify the value was actually set
+                        current_value = await element.input_value()
+                        if current_value == value:
+                            print(f"        ✅ Successfully filled '{field_id}' with '{value}'")
+                            return True
+                        else:
+                            print(f"        ⚠️ Value mismatch - Expected: '{value}', Got: '{current_value}'")
+                    else:
+                        print(f"        ⚠️ Element not interactable - Enabled: {is_enabled}, Visible: {is_visible}")
+                else:
+                    print(f"        ❌ Element not found with selector: {selector}")
+            except Exception as e:
+                print(f"        ❌ Error with selector {selector}: {str(e)}")
+                continue
+        
+        print(f"      ❌ Failed to fill text field '{field_id}'")
+        return False
+    
+    async def _fill_dropdown_field_my_info(self, page: Page, field_id: str, value: str, options: List[str]) -> bool:
+        """Fill a dropdown field on My Information page"""
+        print(f"      🔍 Attempting to fill dropdown field '{field_id}' with value '{value}'")
+        print(f"      📋 Available options: {options}")
+        
+        selectors = [
+            f'select[data-automation-id="{field_id}"]',
+            f'select[id="{field_id}"]',
+            f'select[name="{field_id}"]'
+        ]
+        
+        for i, selector in enumerate(selectors):
+            try:
+                print(f"        🔍 Trying selector {i+1}: {selector}")
+                element = await page.wait_for_selector(selector, timeout=3000, state='visible')
+                if element:
+                    print(f"        ✅ Found dropdown element with selector: {selector}")
+                    
+                    # Check if element is enabled
+                    is_enabled = await element.is_enabled()
+                    print(f"        📊 Dropdown enabled: {is_enabled}")
+                    
+                    if is_enabled:
+                        # Try to select by value first
+                        try:
+                            await element.select_option(value=value)
+                            print(f"        ✅ Successfully selected by value: '{value}'")
+                            return True
+                        except Exception as e:
+                            print(f"        ⚠️ Select by value failed: {str(e)}")
+                        
+                        # Try to select by text
+                        try:
+                            await element.select_option(label=value)
+                            print(f"        ✅ Successfully selected by label: '{value}'")
+                            return True
+                        except Exception as e:
+                            print(f"        ⚠️ Select by label failed: {str(e)}")
+                        
+                        # Try partial match with available options
+                        if options:
+                            for option in options:
+                                if value.lower() in option.lower() or option.lower() in value.lower():
+                                    try:
+                                        await element.select_option(label=option)
+                                        print(f"        ✅ Successfully selected by partial match: '{option}'")
+                                        return True
+                                    except Exception as e:
+                                        print(f"        ⚠️ Partial match failed for '{option}': {str(e)}")
+                                        continue
+                        
+                        # Fallback to first option
+                        try:
+                            await element.select_option(index=1)  # Skip first empty option
+                            print(f"        ✅ Successfully selected first option (fallback)")
+                            return True
+                        except Exception as e:
+                            print(f"        ⚠️ Fallback selection failed: {str(e)}")
+                    else:
+                        print(f"        ⚠️ Dropdown element not enabled")
+                else:
+                    print(f"        ❌ Dropdown element not found with selector: {selector}")
+            except Exception as e:
+                print(f"        ❌ Error with selector {selector}: {str(e)}")
+                continue
+        
+        print(f"      ❌ Failed to fill dropdown field '{field_id}'")
+        return False
+    
+    async def _fill_radio_field_my_info(self, page: Page, field_id: str, value: str, options: List[str]) -> bool:
+        """Fill a radio button field on My Information page with proper radio group handling"""
+        print(f"      🔍 Attempting to fill radio field '{field_id}' with value '{value}'")
+        print(f"      📋 Available options: {options}")
+        
+        # Strategy 1: Find radio buttons by name attribute (proper radio grouping)
+        name_selectors = [
+            f'input[name="{field_id}"]',
+            f'input[data-automation-id="{field_id}"]'
+        ]
+        
+        for i, selector in enumerate(name_selectors):
+            try:
+                print(f"        🔍 Trying radio group selector {i+1}: {selector}")
+                elements = await page.query_selector_all(selector)
+                print(f"        📊 Found {len(elements)} radio elements in group")
+                
+                # First, collect all radio options with their details
+                radio_options = []
+                for j, element in enumerate(elements):
+                    try:
+                        element_value = await element.get_attribute('value')
+                        element_id = await element.get_attribute('id')
+                        element_name = await element.get_attribute('name')
+                        is_visible = await element.is_visible()
+                        is_enabled = await element.is_enabled()
+                        
+                        # Try to get label text for this radio button
+                        label_text = ""
+                        if element_id:
+                            try:
+                                label = await page.query_selector(f'label[for="{element_id}"]')
+                                if label:
+                                    label_text = await label.inner_text()
+                            except:
+                                pass
+                        
+                        radio_options.append({
+                            'element': element,
+                            'value': element_value,
+                            'id': element_id,
+                            'name': element_name,
+                            'label': label_text,
+                            'visible': is_visible,
+                            'enabled': is_enabled,
+                            'index': j
+                        })
+                        
+                        print(f"        📊 Radio {j+1} - Value: '{element_value}', Label: '{label_text}', Visible: {is_visible}, Enabled: {is_enabled}")
+                    except Exception as e:
+                        print(f"        ⚠️ Error analyzing radio element {j+1}: {str(e)}")
+                        continue
+                
+                # Strategy 2: Find the correct radio button to select
+                target_radio = None
+                
+                # Try to match by value first
+                for radio in radio_options:
+                    if radio['visible'] and radio['enabled']:
+                        if radio['value'] and value.lower() == radio['value'].lower():
+                            target_radio = radio
+                            print(f"        🎯 Found exact value match: '{radio['value']}'")
+                            break
+                
+                # Try to match by label text
+                if not target_radio:
+                    for radio in radio_options:
+                        if radio['visible'] and radio['enabled']:
+                            if radio['label'] and value.lower() == radio['label'].lower():
+                                target_radio = radio
+                                print(f"        🎯 Found exact label match: '{radio['label']}'")
+                                break
+                
+                # Try partial matching for common cases
+                if not target_radio:
+                    for radio in radio_options:
+                        if radio['visible'] and radio['enabled']:
+                            # Check value partial match
+                            if radio['value'] and value.lower() in radio['value'].lower():
+                                target_radio = radio
+                                print(f"        🎯 Found partial value match: '{radio['value']}'")
+                                break
+                            # Check label partial match
+                            if radio['label'] and value.lower() in radio['label'].lower():
+                                target_radio = radio
+                                print(f"        🎯 Found partial label match: '{radio['label']}'")
+                                break
+                
+                # Special handling for Yes/No questions
+                if not target_radio and field_id.lower() in ['candidateispreviousworker', 'previousworker', 'workedherebefore']:
+                    print(f"        🎯 Special handling for Yes/No question - looking for '{value}'")
+                    for radio in radio_options:
+                        if radio['visible'] and radio['enabled']:
+                            # Look for "No" option specifically
+                            if value.lower() == 'no':
+                                if (radio['value'] and 'no' in radio['value'].lower()) or \
+                                   (radio['label'] and 'no' in radio['label'].lower()) or \
+                                   (radio['id'] and 'no' in radio['id'].lower()):
+                                    target_radio = radio
+                                    print(f"        🎯 Found 'No' option: Value='{radio['value']}', Label='{radio['label']}'")
+                                    break
+                            # Look for "Yes" option specifically
+                            elif value.lower() == 'yes':
+                                if (radio['value'] and 'yes' in radio['value'].lower()) or \
+                                   (radio['label'] and 'yes' in radio['label'].lower()) or \
+                                   (radio['id'] and 'yes' in radio['id'].lower()):
+                                    target_radio = radio
+                                    print(f"        🎯 Found 'Yes' option: Value='{radio['value']}', Label='{radio['label']}'")
+                                    break
+                
+                # If we found the target radio button, select it
+                if target_radio:
+                    try:
+                        await target_radio['element'].check()
+                        print(f"        ✅ Successfully selected radio option: '{target_radio['value']}' (Label: '{target_radio['label']}')")
+                        
+                        # Verify it was actually selected
+                        is_checked = await target_radio['element'].is_checked()
+                        if is_checked:
+                            print(f"        ✅ Verified radio button is checked")
+                            return True
+                        else:
+                            print(f"        ⚠️ Radio button not checked after selection attempt")
+                    except Exception as e:
+                        print(f"        ❌ Error selecting target radio: {str(e)}")
+                
+                # Fallback: If no specific match found, don't select anything for Yes/No questions
+                # This prevents accidentally selecting "Yes" when we want "No"
+                if field_id.lower() in ['candidateispreviousworker', 'previousworker', 'workedherebefore']:
+                    print(f"        ⚠️ No exact match found for Yes/No question - not selecting fallback to avoid wrong choice")
+                    return False
+                        
+            except Exception as e:
+                print(f"        ❌ Error with selector {selector}: {str(e)}")
+                continue
+        
+        print(f"      ❌ Failed to fill radio field '{field_id}' with value '{value}'")
+        return False
+    
+    async def _fill_checkbox_field_my_info(self, page: Page, field_id: str, value: str) -> bool:
+        """Fill a checkbox field on My Information page"""
+        selectors = [
+            f'input[data-automation-id="{field_id}"]',
+            f'input[id="{field_id}"]',
+            f'input[name="{field_id}"]'
+        ]
+        
+        should_check = value.lower() in ['true', 'yes', '1', 'checked']
+        
+        for selector in selectors:
+            try:
+                element = await page.wait_for_selector(selector, timeout=3000, state='visible')
+                if element:
+                    if should_check:
+                        await element.check()
+                    else:
+                        await element.uncheck()
+                    return True
+            except:
+                continue
+        
+        return False
+    
+
+    
+    async def _get_page_identifier(self, page: Page) -> str:
+        """Create a unique identifier for the current page based on its content, not URL"""
+        try:
+            # Strategy 1: Use page title + visible form field IDs as identifier
+            page_title = await page.title()
+            
+            # Get visible form field IDs to create a content-based signature
+            form_field_ids = []
+            
+            # Look for common form field selectors
+            form_selectors = [
+                'input[data-automation-id]',
+                'select[data-automation-id]',
+                'textarea[data-automation-id]',
+                'button[data-automation-id]'
+            ]
+            
+            for selector in form_selectors:
+                try:
+                    elements = await page.query_selector_all(selector)
+                    for element in elements[:10]:  # Limit to first 10 elements for performance
+                        if await element.is_visible():
+                            field_id = await element.get_attribute('data-automation-id')
+                            if field_id:
+                                form_field_ids.append(field_id)
+                except:
+                    continue
+            
+            # Create identifier from title + sorted field IDs
+            field_signature = '|'.join(sorted(form_field_ids[:5]))  # Use first 5 fields
+            page_identifier = f"{page_title}::{field_signature}"
+            
+            print(f"    🔍 Page identifier: {page_identifier[:100]}...")
+            return page_identifier
+            
+        except Exception as e:
+            print(f"    ⚠️ Error creating page identifier: {str(e)}")
+            # Fallback to URL + timestamp if content-based identification fails
+            return f"{page.url}::{int(time.time())}"
+    
+
+    
+    async def _check_field_has_value(self, page: Page, field_id: str, field_type: str) -> bool:
+        """Check if a specific field has a value"""
+        try:
+            if field_type in ['text', 'email', 'tel', 'password']:
+                selectors = [
+                    f'input[data-automation-id="{field_id}"]',
+                    f'input[id="{field_id}"]',
+                    f'input[name="{field_id}"]',
+                    f'textarea[data-automation-id="{field_id}"]'
+                ]
+                
+                for selector in selectors:
+                    try:
+                        element = await page.query_selector(selector)
+                        if element:
+                            value = await element.input_value()
+                            return bool(value and value.strip())
+                    except:
+                        continue
+                        
+            elif field_type == 'select':
+                selectors = [
+                    f'select[data-automation-id="{field_id}"]',
+                    f'select[id="{field_id}"]',
+                    f'select[name="{field_id}"]'
+                ]
+                
+                for selector in selectors:
+                    try:
+                        element = await page.query_selector(selector)
+                        if element:
+                            value = await element.input_value()
+                            return bool(value and value.strip() and value != "")
+                    except:
+                        continue
+                        
+            elif field_type == 'radio':
+                selectors = [
+                    f'input[data-automation-id="{field_id}"]',
+                    f'input[name="{field_id}"]'
+                ]
+                
+                for selector in selectors:
+                    try:
+                        elements = await page.query_selector_all(selector)
+                        for element in elements:
+                            if await element.is_checked():
+                                return True
+                    except:
+                        continue
+                        
+            elif field_type == 'checkbox':
+                selectors = [
+                    f'input[data-automation-id="{field_id}"]',
+                    f'input[id="{field_id}"]',
+                    f'input[name="{field_id}"]'
+                ]
+                
+                for selector in selectors:
+                    try:
+                        element = await page.query_selector(selector)
+                        if element:
+                            return await element.is_checked()
+                    except:
+                        continue
+                        
+        except Exception as e:
+            print(f"    ⚠️ Error checking field {field_id}: {str(e)}")
+        
+        return False
     
     async def _navigate_my_information_sections(self, page: Page):
         """Navigate through different sections of My Information page"""
