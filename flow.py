@@ -10,6 +10,7 @@ Navigate to a job posting, click Apply, and extract form elements as JSON.
 import os
 import json
 import asyncio
+import time
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional, Tuple
 from dotenv import load_dotenv
@@ -434,6 +435,12 @@ class WorkdayFormScraper:
                 # Phase 4: Extract form elements from pages
                 print("\n📍 Phase 4: Extracting Form Elements")
                 await self._extract_application_forms(page)
+                
+                # Save intermediate results after initial extraction
+                print("\n📍 Phase 4.5: Saving Intermediate Results")
+                intermediate_results = await self._create_results()
+                await self._save_results(intermediate_results)
+                print("  ✅ Intermediate results saved")
                 
                 # Phase 5: Create account using extracted form data
                 print("\n📍 Phase 5: Creating Account")
@@ -1792,215 +1799,9 @@ class WorkdayFormScraper:
         return options
     
     async def _extract_country_dropdown_options(self, element) -> List[str]:
-        """Extract options from country dropdown with specific structure handling"""
-        options = []
-        
-        try:
-            print(f"    🌍 Extracting country dropdown options...")
-            
-            # Get page reference for broader searches
-            page = element.page
-            
-            try:
-                # Strategy 1: Click and wait for options to load
-                await element.click()
-                await asyncio.sleep(3)  # Wait for all options to load
-                
-                # Strategy 2: Look for the specific structure: li[data-value][role="option"] with div containing country name
-                specific_selectors = [
-                    'li[data-value][role="option"]',  # Exact structure from your example
-                    'li[role="option"][data-value]',  # Alternative order
-                    'li[role="option"]',  # Just role option
-                    '[data-value][role="option"]',  # Any element with both attributes
-                    'li[data-value]',  # Just data-value
-                    '[role="option"]',  # Just role option
-                ]
-                
-                all_found_options = set()
-                
-                # First, let's see what elements are available on the page
-                all_li_elements = await page.query_selector_all('li')
-                all_option_elements = await page.query_selector_all('[role="option"]')
-                all_data_value_elements = await page.query_selector_all('[data-value]')
-                
-                print(f"    🔍 Debug: Found {len(all_li_elements)} li elements on page")
-                print(f"    🔍 Debug: Found {len(all_option_elements)} role=option elements on page")
-                print(f"    🔍 Debug: Found {len(all_data_value_elements)} data-value elements on page")
-                
-                for selector in specific_selectors:
-                    try:
-                        option_elements = await page.query_selector_all(selector)
-                        print(f"    🔍 Found {len(option_elements)} elements with selector: {selector}")
-                        
-                        for i, opt in enumerate(option_elements):
-                            try:
-                                # Check if element is visible
-                                is_visible = await opt.is_visible()
-                                print(f"    🔍 Element {i+1} visible: {is_visible}")
-                                
-                                if is_visible:
-                                    # Get data-value attribute
-                                    data_value = await opt.get_attribute('data-value')
-                                    print(f"    🔍 Element {i+1} data-value: {data_value}")
-                                    
-                                    # Try to get country name from the div inside the li element
-                                    country_div = await opt.query_selector('div')
-                                    if country_div:
-                                        country_text = await country_div.inner_text()
-                                        print(f"    🔍 Element {i+1} div text: {country_text}")
-                                    else:
-                                        # Fallback to the li element's text
-                                        country_text = await opt.inner_text()
-                                        print(f"    🔍 Element {i+1} li text: {country_text}")
-                                    
-                                    if country_text and country_text.strip():
-                                        clean_text = country_text.strip()
-                                        
-                                        # Filter out non-country options
-                                        skip_terms = [
-                                            'select', 'choose', 'please', '---', 'loading',
-                                            'search', 'filter', 'all', 'none', 'empty'
-                                        ]
-                                        
-                                        # Only include if it looks like a country name
-                                        if (len(clean_text) > 1 and 
-                                            not any(skip.lower() in clean_text.lower() for skip in skip_terms) and
-                                            not clean_text.isdigit() and
-                                            clean_text not in ['XG', '']):  # Filter out XG and empty strings
-                                            all_found_options.add(clean_text)
-                                            print(f"    ✅ Found country: {clean_text}")
-                                        else:
-                                            print(f"    ⚠️ Filtered out: {clean_text}")
-                            except Exception as e:
-                                print(f"    ⚠️ Error processing option {i+1}: {str(e)}")
-                                continue
-                    except Exception as e:
-                        print(f"    ⚠️ Error with selector {selector}: {str(e)}")
-                        continue
-                
-                options = list(all_found_options)
-                
-                # Strategy 3: If no options found with specific structure, try generic selectors
-                if not options:
-                    print(f"    🔍 Trying generic selectors...")
-                    generic_selectors = [
-                        'div[role="option"]',
-                        'li[role="option"]',
-                        '[role="option"]',
-                        'option',
-                        'li[data-value]',
-                        'div[data-value]'
-                    ]
-                    
-                    for selector in generic_selectors:
-                        try:
-                            option_elements = await page.query_selector_all(selector)
-                            
-                            for opt in option_elements:
-                                try:
-                                    if await opt.is_visible():
-                                        option_text = await opt.inner_text()
-                                        if option_text and option_text.strip():
-                                            clean_text = option_text.strip()
-                                            
-                                            # Filter out non-country options
-                                            if (len(clean_text) > 1 and 
-                                                not clean_text.isdigit() and
-                                                clean_text not in ['XG', 'select', 'choose', 'please']):
-                                                all_found_options.add(clean_text)
-                                except:
-                                    continue
-                        except:
-                            continue
-                    
-                    options = list(all_found_options)
-                
-                # Strategy 4: Scroll to load more options if dropdown supports it
-                if len(options) < 10:  # If we have very few options, try scrolling
-                    try:
-                        dropdown_container = await page.query_selector('ul[role="listbox"], .dropdown-menu, .select-dropdown')
-                        if dropdown_container:
-                            # Scroll to bottom to load all options
-                            await dropdown_container.evaluate('el => el.scrollTop = el.scrollHeight')
-                            await asyncio.sleep(2)
-                            
-                            # Try extraction again after scrolling
-                            for selector in specific_selectors:
-                                try:
-                                    option_elements = await page.query_selector_all(selector)
-                                    for opt in option_elements:
-                                        try:
-                                            if await opt.is_visible():
-                                                country_div = await opt.query_selector('div')
-                                                if country_div:
-                                                    country_text = await country_div.inner_text()
-                                                else:
-                                                    country_text = await opt.inner_text()
-                                                
-                                                if country_text and country_text.strip():
-                                                    clean_text = country_text.strip()
-                                                    if (len(clean_text) > 1 and 
-                                                        not clean_text.isdigit() and
-                                                        clean_text != 'XG'):
-                                                        all_found_options.add(clean_text)
-                                        except:
-                                            continue
-                                except:
-                                    continue
-                            
-                            options = list(all_found_options)
-                    except:
-                        pass
-                
-                # Close dropdown
-                try:
-                    await element.press('Escape')
-                    await asyncio.sleep(0.5)
-                except:
-                    try:
-                        await page.click('body')
-                        await asyncio.sleep(0.5)
-                    except:
-                        pass
-                
-            except Exception as e:
-                print(f"    ⚠️ Error during dropdown interaction: {str(e)}")
-            
-            # Strategy 5: If no options found, provide comprehensive fallback
-            if not options:
-                options = [
-                    "Afghanistan", "Albania", "Algeria", "Argentina", "Armenia", "Australia",
-                    "Austria", "Azerbaijan", "Bahrain", "Bangladesh", "Belarus", "Belgium",
-                    "Bolivia", "Bosnia and Herzegovina", "Brazil", "Bulgaria", "Cambodia",
-                    "Canada", "Chile", "China", "Colombia", "Costa Rica", "Croatia",
-                    "Czech Republic", "Denmark", "Ecuador", "Egypt", "Estonia", "Finland",
-                    "France", "Georgia", "Germany", "Ghana", "Greece", "Guatemala",
-                    "Honduras", "Hong Kong", "Hungary", "Iceland", "India", "Indonesia",
-                    "Ireland", "Israel", "Italy", "Japan", "Jordan", "Kazakhstan",
-                    "Kenya", "Kuwait", "Latvia", "Lebanon", "Lithuania", "Luxembourg",
-                    "Malaysia", "Mexico", "Morocco", "Netherlands", "New Zealand",
-                    "Nigeria", "Norway", "Pakistan", "Panama", "Peru", "Philippines",
-                    "Poland", "Portugal", "Qatar", "Romania", "Russia", "Saudi Arabia",
-                    "Singapore", "Slovakia", "Slovenia", "South Africa", "South Korea",
-                    "Spain", "Sri Lanka", "Sweden", "Switzerland", "Taiwan", "Thailand",
-                    "Turkey", "Ukraine", "United Arab Emirates", "United Kingdom",
-                    "United States", "Uruguay", "Venezuela", "Vietnam", "Other"
-                ]
-                print(f"    ℹ️ Using comprehensive fallback country list ({len(options)} countries)")
-            else:
-                # Sort options alphabetically for better organization
-                options = sorted(list(set(options)))
-                print(f"    ✅ Extracted {len(options)} country options from dropdown")
-        
-        except Exception as e:
-            print(f"    ⚠️ Error in country dropdown extraction: {str(e)}")
-            # Fallback to basic country list
-            options = [
-                "United States", "Canada", "United Kingdom", "Australia", "Germany",
-                "France", "India", "China", "Japan", "Other"
-            ]
-        
-        return options
+        """Return simplified country dropdown identifier without extracting options"""
+        print(f"    🌍 Simplified country dropdown handling - returning identifier only")
+        return ["country--country"]
     
     async def _extract_dropdown_options(self, element) -> List[str]:
         """Extract options from dropdown element"""
