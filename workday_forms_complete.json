@@ -1,16 +1,28 @@
 {
   "extraction_metadata": {
-    "timestamp": "2025-07-23 03:00:42",
+    "timestamp": "2025-07-23 04:21:10",
     "tenant_url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite",
-    "total_pages_crawled": 1,
-    "total_form_elements": 7
+    "total_pages_crawled": 3,
+    "total_form_elements": 33
   },
   "pages_visited": [
     {
-      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-CA%2C-Santa-Clara/Senior-Physical-Design-Engineer_JR2000473/apply/applyManually",
-      "title": "Senior Physical Design Engineer",
+      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-CA%2C-Santa-Clara/Senior-Systems-Software-Security-Engineer---Factory-and-Security-Provisioning_JR1996707/apply/applyManually",
+      "title": "Senior Systems Software Security Engineer – Factory and Security Provisioning",
       "page_type": "Job Application",
       "form_count": 7
+    },
+    {
+      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-CA%2C-Santa-Clara/Senior-Systems-Software-Security-Engineer---Factory-and-Security-Provisioning_JR1996707/apply/applyManually",
+      "title": "Senior Systems Software Security Engineer – Factory and Security Provisioning",
+      "page_type": "Application Flow",
+      "form_count": 13
+    },
+    {
+      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-CA%2C-Santa-Clara/Senior-Systems-Software-Security-Engineer---Factory-and-Security-Provisioning_JR1996707/apply/applyManually",
+      "title": "Senior Systems Software Security Engineer – Factory and Security Provisioning",
+      "page_type": "My Information",
+      "form_count": 13
     }
   ],
   "form_elements": [
@@ -65,6 +77,224 @@
     {
       "label": "Unlabeled Field",
       "id_of_input_component": "beecatcher",
+      "required": false,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Radio Group (candidateIsPreviousWorker)",
+      "id_of_input_component": "candidateIsPreviousWorker",
+      "required": false,
+      "type_of_input": "radio",
+      "options": [
+        "Yes",
+        "No"
+      ],
+      "user_data_select_values": [
+        "No"
+      ]
+    },
+    {
+      "label": "Search",
+      "id_of_input_component": "source--source",
+      "required": true,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "nocm4",
+      "required": false,
+      "type_of_input": "radio",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "nocm5",
+      "required": false,
+      "type_of_input": "radio",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "name--legalName--firstName",
+      "required": true,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "name--legalName--lastName",
+      "required": true,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "name--preferredCheck",
+      "required": false,
+      "type_of_input": "checkbox",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "address--addressLine1",
+      "required": false,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "address--city",
+      "required": false,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "address--postalCode",
+      "required": false,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Search",
+      "id_of_input_component": "phoneNumber--countryPhoneCode",
+      "required": true,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "phoneNumber--phoneNumber",
+      "required": true,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "phoneNumber--extension",
+      "required": false,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Radio Group (candidateIsPreviousWorker)",
+      "id_of_input_component": "candidateIsPreviousWorker",
+      "required": false,
+      "type_of_input": "radio",
+      "options": [
+        "Yes",
+        "No"
+      ],
+      "user_data_select_values": [
+        "No"
+      ]
+    },
+    {
+      "label": "Search",
+      "id_of_input_component": "source--source",
+      "required": true,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "nocm4",
+      "required": false,
+      "type_of_input": "radio",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "nocm5",
+      "required": false,
+      "type_of_input": "radio",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "name--legalName--firstName",
+      "required": true,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "name--legalName--lastName",
+      "required": true,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "name--preferredCheck",
+      "required": false,
+      "type_of_input": "checkbox",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "address--addressLine1",
+      "required": false,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "address--city",
+      "required": false,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "address--postalCode",
+      "required": false,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Search",
+      "id_of_input_component": "phoneNumber--countryPhoneCode",
+      "required": true,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "phoneNumber--phoneNumber",
+      "required": true,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "phoneNumber--extension",
       "required": false,
       "type_of_input": "text",
       "options": [],
