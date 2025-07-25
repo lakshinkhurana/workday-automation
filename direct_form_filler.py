@@ -33,7 +33,7 @@ class DirectFormFiller:
             'phoneNumber--countryPhoneCode': '+1',
             'phoneNumber--extension': '',
             'country--country': 'United States',
-            'source--source': 'vidyapeeth',
+            'source--source': os.getenv('JOB_BOARD',''),
             'candidateIsPreviousWorker': 'No',  # Radio button for previous employee
             
             # Date fields - individual components
@@ -127,9 +127,9 @@ class DirectFormFiller:
         
         print(f"    🔍 Attempting to fill field '{field_id}' with value '{value}'")
         
-        # Special handling for dropdown fields that need typing + Enter
+        # Special handling for source dropdown field
         if field_id == 'source--source':
-            return await self._handle_dropdown_with_typing(page, field_id, value)
+            return await self._handle_source_dropdown_simple(page, field_id, value)
         
         # Special handling for phone device type dropdown
         if field_id == 'phoneNumber--phoneDeviceType':
@@ -394,6 +394,52 @@ class DirectFormFiller:
             print(f"    ❌ Critical error handling phone device type dropdown {field_id}: {str(e)}")
             return False
     
+    async def _handle_source_dropdown_simple(self, page, field_id: str, value: str) -> bool:
+        """Handle source--source dropdown field - click once, type, and press Enter"""
+        
+        print(f"      🔍 Handling source dropdown for: {field_id}")
+        
+        try:
+            # Simple selector for the source field
+            selector = f'input[id="{field_id}"]'
+            
+            print(f"        🔍 Trying source dropdown selector: {selector}")
+            element = await page.query_selector(selector)
+            
+            if element and await element.is_visible():
+                is_enabled = await element.is_enabled()
+                print(f"        ✅ Found source element: enabled={is_enabled}")
+                
+                if is_enabled:
+                    # Simple approach: Click once, type, and press Enter
+                    print(f"        🔍 Click once, type '{value}', and press Enter")
+                    
+                    # Click to focus the field
+                    await page.click(selector)
+                    await asyncio.sleep(0.3)
+                    
+                    # Type the value
+                    await page.type(selector, value, delay=100)
+                    await asyncio.sleep(0.5)
+                    
+                    # Press Enter
+                    await page.keyboard.press('Enter')
+                    await asyncio.sleep(0.5)
+                    
+                    print(f"    ✅ Successfully filled source dropdown '{field_id}' with click, type, and Enter")
+                    return True
+                else:
+                    print(f"        Source element not enabled")
+            else:
+                print(f"        Source element not found or not visible")
+            
+            print(f"    ❌ Could not find or fill source dropdown field: {field_id}")
+            return False
+            
+        except Exception as e:
+            print(f"    ❌ Critical error handling source dropdown {field_id}: {str(e)}")
+            return False
+
     async def _handle_dropdown_with_typing(self, page, field_id: str, value: str) -> bool:
         """Handle dropdown fields that require typing + Enter"""
         
@@ -561,6 +607,7 @@ class DirectFormFiller:
                                 await page.check(f'#{radio_id}')
                                 print(f"        ✅ Selected 'Yes' radio button: {radio_value}")
                                 return True
+                    
                     
                     break
                 else:

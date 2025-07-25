@@ -1345,6 +1345,13 @@ class WorkdayFormScraper:
                     print(f"    ✅ Found navigation button: '{nav_text}'")
                     await element.click()
                     print("    🖱️ Clicked navigation button")
+                    
+                    # Wait for automatic redirection before checking progress
+                    print("    ⏳ Waiting for automatic redirection...")
+                    await asyncio.sleep(3)  # Wait 3 seconds for redirection
+                    await page.wait_for_load_state("networkidle", timeout=10000)
+                    print("    ✅ Redirection completed")
+                    
                     return True
             except:
                 continue
