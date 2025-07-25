@@ -15,12 +15,14 @@ class DirectFormFiller:
     def __init__(self):
         self.filled_count = 0
         
-        # Get current date components for date fields
+        # Set up today's date for form filling
         from datetime import datetime
         today = datetime.now()
-        today_month = str(today.month).zfill(2)  # Zero-padded month
-        today_day = str(today.day).zfill(2)      # Zero-padded day
+        today_month = str(today.month).zfill(2)  # need zero padding like "07"
+        today_day = str(today.day).zfill(2)      # same here, "26" not "26"
         today_year = str(today.year)
+        # Self identity wants the whole date mashed together like 07262025
+        today_full_date = f"{today_month}{today_day}{today_year}"
         
         # Direct mapping of field id to environment variable
         self.field_mappings = {
@@ -29,28 +31,30 @@ class DirectFormFiller:
             'name--legalName--lastName': os.getenv('REGISTRATION_LAST_NAME', ''),
             'email': os.getenv('REGISTRATION_EMAIL', ''),
             'phoneNumber--phoneNumber': os.getenv('REGISTRATION_PHONE', ''),
-            'phoneNumber--phoneDeviceType': 'Home',  # Phone type field
+            'phoneNumber--phoneDeviceType': 'Home',  # just defaulting to Home for phone type
             'phoneNumber--countryPhoneCode': '+1',
             'phoneNumber--extension': '',
             'country--country': 'United States',
             'source--source': os.getenv('JOB_BOARD',''),
-            'candidateIsPreviousWorker': 'No',  # Radio button for previous employee
+            'candidateIsPreviousWorker': 'No',  # always say no to previous employee question
             
-            # Date fields - individual components
+            # Self Identity stuff - this page is a bit different
+            'selfIdentifiedDisabilityData--name': os.getenv('REGISTRATION_FIRST_NAME', '') + ' ' + os.getenv('REGISTRATION_LAST_NAME', ''),
+            'selfIdentifiedDisabilityData--dateSignedOn-dateSectionMonth-input': today_full_date,  # they want the whole date smooshed together
+            'selfIdentifiedDisabilityData--employeeId': '',  # this one's usually blank
+            
+            # Regular date fields for other pages that want them split up
             'dateSectionMonth-input': today_month,
             'dateSectionDay-input': today_day,
             'dateSectionYear-input': today_year,
-            'selfIdentifiedDisabilityData--dateSignedOn-dateSectionMonth-input': today_month,
-            'selfIdentifiedDisabilityData--dateSignedOn-dateSectionDay-input': today_day,
-            'selfIdentifiedDisabilityData--dateSignedOn-dateSectionYear-input': today_year,
             
-            # Skip address fields as requested
+            # Skipping address stuff since we don't need it
             # 'address--addressLine1': '',
             # 'address--city': '',
             # 'address--postalCode': '',
             # 'address--countryRegion': '',
             
-            # Other potential fields
+            # Misc other fields we might run into
             'currentCompany': os.getenv('CURRENT_COMPANY', ''),
             'currentRole': os.getenv('CURRENT_ROLE', ''),
             'workExperience': os.getenv('YEARS_EXPERIENCE', ''),
@@ -66,7 +70,7 @@ class DirectFormFiller:
         """Fill all fields on page by finding them with id, data-automation-id, or name attributes"""
         print("  🎯 Direct form filling by id, data-automation-id, and name attributes...")
         
-        # First, let's debug what fields are actually on the page
+        # Let's see what we're working with first
         await self._debug_page_fields(page)
         
         self.filled_count = 0
@@ -88,11 +92,11 @@ class DirectFormFiller:
         print("  🔍 Debugging: Looking for all form fields on page...")
         
         try:
-            # Find all input fields
+            # Let's grab all the input fields and see what we got
             inputs = await page.query_selector_all('input')
             print(f"    Found {len(inputs)} input elements:")
             
-            for i, input_elem in enumerate(inputs[:10]):  # Show first 10
+            for i, input_elem in enumerate(inputs[:10]):  # just showing first 10 so we don't sp
                 try:
                     input_id = await input_elem.get_attribute('id')
                     input_name = await input_elem.get_attribute('name')
@@ -135,18 +139,22 @@ class DirectFormFiller:
         if field_id == 'phoneNumber--phoneDeviceType':
             return await self._handle_phone_device_type_dropdown(page, field_id, value)
         
+        # Special handling for Self Identity date field - use full date format
+        if field_id == 'selfIdentifiedDisabilityData--dateSignedOn-dateSectionMonth-input':
+            return await self._handle_self_identity_date(page, field_id, value)
+        
         # Special handling for date spinbutton fields - use simple fill
         if any(date_field in field_id for date_field in ['dateSectionMonth', 'dateSectionDay', 'dateSectionYear']):
             return await self._handle_date_simple_fill(page, field_id, value)
         
         try:
-            # Strategy 1: Text input fields - comprehensive selector approach
+            # Try different ways to find text input fields
             text_selectors = [
-                f'input[id="{field_id}"]',  # Try id first (for My Information page)
-                f'input[data-automation-id="{field_id}"]',  # Then data-automation-id
-                f'input[name="{field_id}"]',  # Also try name attribute
-                f'input[id*="{field_id}"]',  # Partial id match
-                f'input[data-automation-id*="{field_id}"]'  # Partial data-automation-id match
+                f'input[id="{field_id}"]',  # id first since My Info page uses those
+                f'input[data-automation-id="{field_id}"]',  # then the automation ids
+                f'input[name="{field_id}"]',  # name attribute as backup
+                f'input[id*="{field_id}"]',  # partial matches in case ids are weird
+                f'input[data-automation-id*="{field_id}"]'  # same for automation ids
             ]
             
             for i, selector in enumerate(text_selectors):
@@ -162,7 +170,7 @@ class DirectFormFiller:
                         
                         if is_visible and is_enabled:
                             if input_type in ['text', 'email', 'tel', None]:
-                                # Special handling for date fields - use typing instead of fill
+                                # Date fields are picky and need special treatment
                                 if 'date' in field_id.lower() or field_id in ['dateSectionMonth-input', 'dateSectionDay-input', 'dateSectionYear-input']:
                                     print(f"        🔍 Date field detected - using typing method")
                                     
@@ -170,19 +178,19 @@ class DirectFormFiller:
                                     await page.click(selector)
                                     await asyncio.sleep(0.3)
                                     
-                                    # Clear the field using keyboard shortcuts
-                                    await page.keyboard.press('Control+a')  # Select all
+                                    # Clear whatever's in there first
+                                    await page.keyboard.press('Control+a')  # grab everything
                                     await asyncio.sleep(0.2)
-                                    await page.keyboard.press('Delete')  # Delete selected content
+                                    await page.keyboard.press('Delete')  # nuke it
                                     await asyncio.sleep(0.2)
                                     
-                                    # Type the new value
-                                    await page.type(selector, value, delay=100)  # Type with delay
+                                    # Now type the new stuff
+                                    await page.type(selector, value, delay=100)  # go slow so it registers
                                     await asyncio.sleep(0.5)
                                 else:
-                                    # Wait for element to be ready and use page methods instead of element methods
+                                    # Regular fields can just use fill
                                     await page.wait_for_selector(selector, state='attached')
-                                    await page.fill(selector, '')  # Clear by filling with empty string
+                                    await page.fill(selector, '')  # clear it first
                                     await page.fill(selector, value)
                                 
                                 # Verify the value was filled
@@ -208,7 +216,7 @@ class DirectFormFiller:
                     print(f"        Error with selector {selector}: {str(e)}")
                     continue
             
-            # Strategy 2: Select dropdown fields - comprehensive approach
+            # Now let's try select dropdown fields - same deal
             select_selectors = [
                 f'select[id="{field_id}"]',
                 f'select[data-automation-id="{field_id}"]',
@@ -238,7 +246,7 @@ class DirectFormFiller:
                     print(f"        Error with select selector {selector}: {str(e)}")
                     continue
             
-            # Strategy 3: Textarea fields - comprehensive approach
+            # Textarea fields - same approach as above
             textarea_selectors = [
                 f'textarea[id="{field_id}"]',
                 f'textarea[data-automation-id="{field_id}"]',
@@ -260,10 +268,10 @@ class DirectFormFiller:
                         if is_visible and is_enabled:
                             # Wait for element to be ready and use page methods instead of element methods
                             await page.wait_for_selector(selector, state='attached')
-                            await page.fill(selector, '')  # Clear by filling with empty string
+                            await page.fill(selector, '')  # clear it first
                             await page.fill(selector, value)
                             
-                            # Verify the value was filled
+                            # Check if it actually worked
                             filled_value = await page.input_value(selector)
                             if filled_value == value:
                                 print(f"    ✅ Successfully filled textarea using selector: {selector}")
@@ -276,7 +284,7 @@ class DirectFormFiller:
                     print(f"        Error with textarea selector {selector}: {str(e)}")
                     continue
             
-            # Strategy 4: Radio button groups (enhanced with better selectors)
+            # Radio button groups need special handling
             if field_id in ['candidateIsPreviousWorker', 'workAuthorization', 'requiresSponsorship']:
                 print(f"      🔍 Handling radio button group for: {field_id}")
                 return await self._handle_radio_by_id(page, field_id, value)
@@ -289,24 +297,24 @@ class DirectFormFiller:
             return False
     
     async def _handle_select_by_id(self, select_element, value: str) -> bool:
-        """Handle select dropdown by trying different selection methods"""
+        """Handle select dropdown by trying different ways to select stuff"""
         
         try:
-            # Try by value
+            # Try by value first
             await select_element.select_option(value=value)
             return True
         except:
             pass
         
         try:
-            # Try by label/text
+            # Try by the text label
             await select_element.select_option(label=value)
             return True
         except:
             pass
         
         try:
-            # Try to find option that contains the value
+            # Look through all the options and find one that matches
             options = await select_element.query_selector_all('option')
             for option in options:
                 option_text = await option.inner_text()
@@ -481,6 +489,77 @@ class DirectFormFiller:
     
 
 
+    async def _handle_self_identity_date(self, page, field_id: str, value: str) -> bool:
+        """Handle Self Identity date field - click and type full date format MMDDYYYY"""
+        
+        print(f"      🔍 Handling Self Identity date field for: {field_id}")
+        
+        try:
+            # Based on your HTML structure:
+            # <input role="spinbutton" aria-describedby="helpText-selfIdentifiedDisabilityData--dateSignedOn" 
+            # aria-label="Month" aria-valuemax="12" aria-valuemin="1" aria-valuetext="MM" 
+            # id="selfIdentifiedDisabilityData--dateSignedOn-dateSectionMonth-input" 
+            # data-automation-id="dateSectionMonth-input" class="css-72im0m" value="">
+            
+            # Try different selectors for the Self Identity date field
+            selectors = [
+                f'input[id="{field_id}"]',
+                f'input[data-automation-id="dateSectionMonth-input"]',
+                f'input[role="spinbutton"][id="{field_id}"]',
+                f'input[aria-label="Month"][id="{field_id}"]',
+                f'input[id*="selfIdentifiedDisabilityData--dateSignedOn"]'
+            ]
+            
+            for selector in selectors:
+                try:
+                    print(f"        🔍 Trying Self Identity date selector: {selector}")
+                    element = await page.query_selector(selector)
+                    if element and await element.is_visible():
+                        is_enabled = await element.is_enabled()
+                        input_role = await element.get_attribute('role')
+                        aria_label = await element.get_attribute('aria-label')
+                        
+                        print(f"        ✅ Found Self Identity date element: enabled={is_enabled}, role={input_role}, aria-label='{aria_label}'")
+                        
+                        if is_enabled:
+                            # Click on the field and type the whole date
+                            print(f"        🔍 Click and type full date '{value}' (MMDDYYYY format)")
+                            
+                            # Click to focus the field
+                            await page.click(selector)
+                            await asyncio.sleep(0.3)
+                            
+                            # Clear whatever's already there
+                            await page.keyboard.press('Control+a')
+                            await asyncio.sleep(0.2)
+                            await page.keyboard.press('Delete')
+                            await asyncio.sleep(0.2)
+                            
+                            # Type the whole date like "07262025"
+                            await page.type(selector, value, delay=100)
+                            await asyncio.sleep(0.5)
+                            
+                            # Check if it worked
+                            filled_value = await page.input_value(selector)
+                            if filled_value == value:
+                                print(f"    ✅ Successfully filled Self Identity date '{field_id}' with '{value}'")
+                                return True
+                            else:
+                                print(f"    ⚠️ Self Identity date value not set correctly. Expected: '{value}', Got: '{filled_value}'")
+                        else:
+                            print(f"        Self Identity date element not enabled: {selector}")
+                        
+                except Exception as e:
+                    print(f"        Error with Self Identity date selector {selector}: {str(e)}")
+                    continue
+            
+            print(f"    ❌ Could not find or fill Self Identity date field: {field_id}")
+            return False
+            
+        except Exception as e:
+            print(f"    ❌ Critical error handling Self Identity date {field_id}: {str(e)}")
+            return False
+
     async def _handle_date_simple_fill(self, page, field_id: str, value: str) -> bool:
         """Handle date fields using simple fill method with format like 01012005"""
         
@@ -619,6 +698,142 @@ class DirectFormFiller:
             print(f"    ❌ Radio error for {field_id}: {str(e)}")
             return False
     
+    async def handle_self_identity_page(self, page) -> bool:
+        """Handle Self Identity page - fill name, date, checkboxes and press Save and Continue"""
+        print("  📊 Processing Self Identity page...")
+        
+        try:
+            # Fill Self Identity fields in order
+            self_identity_fields = {
+                'selfIdentifiedDisabilityData--name': os.getenv('REGISTRATION_FIRST_NAME', '') + ' ' + os.getenv('REGISTRATION_LAST_NAME', ''),
+                'selfIdentifiedDisabilityData--dateSignedOn-dateSectionMonth-input': f"{str(datetime.now().month).zfill(2)}{str(datetime.now().day).zfill(2)}{str(datetime.now().year)}",  # MMDDYYYY format
+                'selfIdentifiedDisabilityData--employeeId': ''  # Usually left empty
+            }
+            
+            filled_count = 0
+            
+            # Fill the basic fields
+            for field_id, value in self_identity_fields.items():
+                if value:  # Only fill if we have a value
+                    success = await self._fill_field_by_id(page, field_id, value)
+                    if success:
+                        filled_count += 1
+                        print(f"    ✅ {field_id}: {value}")
+                    else:
+                        print(f"    ⚠️ Not found: {field_id}")
+            
+            # Handle disability status checkboxes
+            await self._handle_disability_checkboxes(page)
+            
+            # Press Save and Continue button
+            save_success = await self._press_save_and_continue(page)
+            
+            if save_success:
+                print(f"  ✅ Self Identity page completed: {filled_count} fields filled, checkboxes handled, form submitted")
+                return True
+            else:
+                print(f"  ⚠️ Self Identity page completed: {filled_count} fields filled, but could not submit form")
+                return False
+                
+        except Exception as e:
+            print(f"  ❌ Error handling Self Identity page: {str(e)}")
+            return False
+    
+    async def _handle_disability_checkboxes(self, page) -> bool:
+        """Handle disability status checkboxes on Self Identity page"""
+        print("    🔲 Handling disability status checkboxes...")
+        
+        try:
+            # Common disability checkbox selectors (these are usually required)
+            checkbox_selectors = [
+                'input[id*="disabilityStatus"]',
+                'input[data-automation-id*="disabilityStatus"]',
+                'input[type="checkbox"][id*="disability"]',
+                'input[type="checkbox"][name*="disability"]'
+            ]
+            
+            checkboxes_found = 0
+            
+            for selector in checkbox_selectors:
+                try:
+                    checkboxes = await page.query_selector_all(selector)
+                    for checkbox in checkboxes:
+                        if await checkbox.is_visible() and await checkbox.is_enabled():
+                            checkbox_id = await checkbox.get_attribute('id')
+                            is_checked = await checkbox.is_checked()
+                            
+                            print(f"      🔍 Found checkbox: {checkbox_id}, currently checked: {is_checked}")
+                            
+                            # For disability status, typically select "I don't wish to answer" or similar
+                            # This is usually the first or last option
+                            if not is_checked:
+                                await page.check(f'#{checkbox_id}')
+                                print(f"      ✅ Checked disability checkbox: {checkbox_id}")
+                                checkboxes_found += 1
+                                break  # Usually only need to check one option
+                            
+                except Exception as e:
+                    print(f"      ⚠️ Error with checkbox selector {selector}: {str(e)}")
+                    continue
+            
+            if checkboxes_found > 0:
+                print(f"    ✅ Handled {checkboxes_found} disability checkboxes")
+                return True
+            else:
+                print(f"    ⚠️ No disability checkboxes found or handled")
+                return False
+                
+        except Exception as e:
+            print(f"    ❌ Error handling disability checkboxes: {str(e)}")
+            return False
+    
+    async def _press_save_and_continue(self, page) -> bool:
+        """Press Save and Continue button on Self Identity page"""
+        print("    💾 Looking for Save and Continue button...")
+        
+        try:
+            # Common Save and Continue button selectors
+            save_selectors = [
+                'button:has-text("Save and Continue")',
+                'button:has-text("Save & Continue")',
+                'button:has-text("Continue")',
+                'button:has-text("Next")',
+                'button:has-text("Save")',
+                'button[type="submit"]',
+                'input[type="submit"]',
+                '[data-automation-id*="save"]',
+                '[data-automation-id*="continue"]',
+                '[data-automation-id*="next"]'
+            ]
+            
+            for selector in save_selectors:
+                try:
+                    element = await page.wait_for_selector(selector, timeout=3000, state='visible')
+                    if element and not await element.is_disabled():
+                        button_text = await element.inner_text()
+                        print(f"    ✅ Found Save button: '{button_text}'")
+                        
+                        await element.click()
+                        print(f"    🖱️ Clicked Save and Continue button")
+                        
+                        # Wait for form submission and redirection
+                        print("    ⏳ Waiting for form submission and redirection...")
+                        await asyncio.sleep(3)  # Wait for submission
+                        await page.wait_for_load_state("networkidle", timeout=10000)
+                        print("    ✅ Form submitted and page redirected")
+                        
+                        return True
+                except Exception as e:
+                    print(f"    ⚠️ Error with save selector {selector}: {str(e)}")
+                    continue
+            
+            print(f"    ❌ Could not find Save and Continue button")
+            return False
+            
+        except Exception as e:
+            print(f"    ❌ Critical error pressing Save and Continue: {str(e)}")
+            return False
+
     async def submit_form(self, page) -> bool:
         """Submit the form after filling"""
         
