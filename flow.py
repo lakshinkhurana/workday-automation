@@ -21,7 +21,7 @@ from direct_form_filler import DirectFormFiller
 # Load environment variables
 load_dotenv()
 
-# Configuration constants
+# Config stuff
 OUTPUT_FILE = "workday_forms_complete.json"
 DEFAULT_TIMEOUT = 30000
 
@@ -213,11 +213,11 @@ class WorkdayFormScraper:
 
     
     def _fuzzy_match_field(self, field_id: str, field_label: str) -> Optional[str]:
-        """Attempt fuzzy matching for field names that don't exactly match mapping keys"""
+        """Try to match field names that don't exactly match our mapping keys"""
         field_id_lower = field_id.lower()
         field_label_lower = field_label.lower()
         
-        # Check if any mapping key is contained in the field ID or label
+        # See if any mapping key is contained in the field ID or label
         for mapping_key, env_var in FIELD_MAPPINGS.items():
             mapping_key_lower = mapping_key.lower()
             
@@ -335,7 +335,7 @@ class WorkdayFormScraper:
         
         # Handle phone number formatting
         if 'phone' in field_id_lower:
-            # Remove any non-digit characters and format
+            # Strip out any non-digit characters and format nicely
             digits_only = re.sub(r'\D', '', env_value)
             if len(digits_only) == 10:
                 return f"({digits_only[:3]}) {digits_only[3:6]}-{digits_only[6:]}"
@@ -372,7 +372,7 @@ class WorkdayFormScraper:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=False)
             context = await browser.new_context(
-                viewport={'width': 1920, 'height': 1080},
+                viewport={'width': 1534, 'height': 860},
                 user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             )
             page = await context.new_page()
@@ -632,7 +632,7 @@ class WorkdayFormScraper:
         # Create page info for current page
         current_url = page.url
         
-        # Check if we've already extracted from this page
+        # Don't extract from the same page twice
         if current_url in self.extracted_pages:
             print(f"  ℹ️ Already extracted from this page: {current_url}")
             return
