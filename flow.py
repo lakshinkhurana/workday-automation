@@ -957,67 +957,612 @@ class WorkdayFormScraper:
 
     
     async def _extract_my_information_page(self, page: Page):
-        """Extract and fill form elements on My Information page"""
-        print("  📋 Processing My Information page...")
+        """Process Workday application pages using progress bar detection"""
+        print("  📋 Processing Workday application pages...")
         
         try:
-            # Wait for My Information page to fully load
+            # Wait for page to fully load
             await page.wait_for_load_state("networkidle", timeout=10000)
             await asyncio.sleep(3)  # Allow dynamic content to load
             
-            # Create page info for My Information page
+            # Start processing pages in sequence using progress bar detection
+            await self._process_workday_application_flow(page)
+            
+        except Exception as e:
+            self.errors.append(f"Error processing Workday application: {str(e)}")
+            print(f"  ❌ Error processing Workday application: {str(e)}")
+    
+    async def _process_workday_application_flow(self, page: Page):
+        """Process all pages in the Workday application flow using progress bar detection"""
+        processed_steps = set()
+        max_iterations = 10  # Prevent infinite loops
+        iteration = 0
+        
+        while iteration < max_iterations:
+            iteration += 1
+            
+            # Detect current step using progress bar
+            current_step = await self._detect_current_step(page)
+            
+            if not current_step:
+                print("  ℹ️ Could not detect current step - application may be complete")
+                break
+            
+            if current_step in processed_steps:
+                print(f"  ℹ️ Already processed step: {current_step}")
+                break
+            
+            print(f"  📍 Processing Step {iteration}: {current_step}")
+            
+            # Extract JSON from current page
+            await self._extract_current_page_json(page, current_step)
+            
+            # Handle page-specific actions based on progress bar step
+            await self._handle_step_specific_actions(page, current_step)
+            
+            # Mark step as processed
+            processed_steps.add(current_step)
+            
+            # Try to continue to next page
+            navigation_success = await self._navigate_to_next_step(page)
+            
+            if not navigation_success:
+                print("  ✅ No more navigation available - application flow complete")
+                break
+            
+            # Wait for next page to load
+            await page.wait_for_load_state("networkidle", timeout=10000)
+            await asyncio.sleep(2)
+        
+        print(f"  ✅ Workday application flow complete - processed {len(processed_steps)} steps")
+    
+    async def _detect_current_step(self, page: Page) -> str:
+        """Detect current step using progressBarActiveStep and content below it"""
+        try:
+            # Look for progress bar active step
+            progress_selectors = [
+                '[data-automation-id="progressBarActiveStep"]',
+                '.progressBarActiveStep',
+                '[class*="progressBarActiveStep"]',
+                '[class*="active-step"]',
+                '[aria-current="step"]'
+            ]
+            
+            for selector in progress_selectors:
+                try:
+                    progress_element = await page.query_selector(selector)
+                    if progress_element:
+                        step_text = await progress_element.inner_text()
+                        print(f"    🎯 Found active step: '{step_text}' using selector: {selector}")
+                        
+                        # Also check the div below it for additional context
+                        step_content = await self._get_step_content_below(page, progress_element)
+                        if step_content:
+                            print(f"    📋 Step content: {step_content[:100]}...")
+                        
+                        return step_text.strip()
+                except:
+                    continue
+            
+            # Fallback: Try to detect step from page content
+            fallback_step = await self._detect_step_from_content(page)
+            if fallback_step:
+                print(f"    🔍 Detected step from content: {fallback_step}")
+                return fallback_step
+            
+            print("    ⚠️ Could not detect current step")
+            return None
+            
+        except Exception as e:
+            print(f"    ❌ Error detecting current step: {str(e)}")
+            return None
+    
+    async def _get_step_content_below(self, page: Page, progress_element) -> str:
+        """Get content from div below the progress bar element"""
+        try:
+            # Try to find the next sibling or parent's next sibling
+            content_selectors = [
+                'xpath=following-sibling::div[1]',
+                'xpath=../following-sibling::div[1]',
+                'xpath=../../following-sibling::div[1]'
+            ]
+            
+            for selector in content_selectors:
+                try:
+                    content_element = await progress_element.query_selector(selector)
+                    if content_element:
+                        content_text = await content_element.inner_text()
+                        if content_text and len(content_text.strip()) > 0:
+                            return content_text.strip()
+                except:
+                    continue
+            
+            return ""
+        except:
+            return ""
+    
+    async def _detect_step_from_content(self, page: Page) -> str:
+        """Fallback method to detect step from page content"""
+        try:
+            # Look for common step indicators in headings
+            heading_selectors = ['h1', 'h2', 'h3', '[role="heading"]']
+            
+            for selector in heading_selectors:
+                headings = await page.query_selector_all(selector)
+                for heading in headings:
+                    if await heading.is_visible():
+                        text = await heading.inner_text()
+                        text_lower = text.lower()
+                        
+                        # Check for common step names
+                        if any(keyword in text_lower for keyword in [
+                            'information', 'experience', 'education', 'review', 
+                            'application', 'personal', 'work', 'skills'
+                        ]):
+                            return text.strip()
+            
+            return None
+        except:
+            return None
+    
+    async def _extract_current_page_json(self, page: Page, step_name: str):
+        """Extract form elements from current page and save as JSON"""
+        try:
             current_url = page.url
+            page_title = await page.title()
             
-            # Check if we've already processed this specific page content by looking for unique page identifiers
+            # Create page info
+            page_info = PageInfo(
+                url=current_url,
+                path=current_url.replace(self.tenant_url, '') or '/',
+                title=f"{step_name} - {page_title}",
+                page_type=step_name,
+                visited=True
+            )
+            
+            # Special handling for Voluntary Disclosures page
+            if 'voluntary' in step_name.lower() or 'disclosure' in step_name.lower():
+                print(f"    🔍 Special extraction for Voluntary Disclosures page...")
+                await asyncio.sleep(2)  # Extra wait for dynamic content
+                page_forms = await self._extract_voluntary_disclosures_forms(page, page_info)
+            else:
+                # Extract form elements from current page
+                page_forms = await self._extract_page_forms(page, page_info)
+            
+            page_info.form_count = len(page_forms)
+            self.form_elements.extend(page_forms)
+            self.discovered_pages.append(page_info)
+            
+            print(f"    ✅ Extracted {len(page_forms)} form elements from '{step_name}' page")
+            
+            # Save current results to JSON after each page
+            print("    💾 Saving extracted form data to JSON...")
+            current_results = await self._create_results()
+            await self._save_results(current_results)
+            print("    ✅ Form data saved to JSON")
+            
+        except Exception as e:
+            print(f"    ❌ Error extracting JSON from '{step_name}': {str(e)}")
+    
+    async def _extract_voluntary_disclosures_forms(self, page: Page, page_info: PageInfo) -> List[FormElement]:
+        """Enhanced form extraction specifically for Voluntary Disclosures page"""
+        form_elements = []
+        
+        try:
+            print("    🔍 Looking for voluntary disclosure form elements...")
+            
+            # Look for common voluntary disclosure field patterns
+            voluntary_selectors = [
+                'select[id*="ethnicity"]',
+                'select[name*="ethnicity"]',
+                'select[id*="race"]',
+                'select[name*="race"]',
+                'select[id*="gender"]',
+                'select[name*="gender"]',
+                'select[id*="veteran"]',
+                'select[name*="veteran"]',
+                'select[id*="military"]',
+                'select[name*="military"]',
+                'select[id*="disability"]',
+                'select[name*="disability"]',
+                'input[name*="ethnicity"]',
+                'input[name*="race"]',
+                'input[name*="gender"]',
+                'input[name*="veteran"]',
+                'input[name*="military"]',
+                'input[name*="disability"]',
+                'input[type="radio"]',
+                'select',  # All select elements
+                'input[type="checkbox"]'  # All checkboxes
+            ]
+            
+            found_elements = set()  # Prevent duplicates
+            
+            for selector in voluntary_selectors:
+                try:
+                    elements = await page.query_selector_all(selector)
+                    print(f"      Found {len(elements)} elements with selector: {selector}")
+                    
+                    for element in elements:
+                        if await element.is_visible():
+                            element_id = await self._extract_identifier(element)
+                            
+                            # Skip if we've already processed this element
+                            if element_id in found_elements:
+                                continue
+                            
+                            found_elements.add(element_id)
+                            
+                            # Extract form element data
+                            label = await self._extract_label(element)
+                            required = await self._is_required(element)
+                            control_type = await self._identify_control_type(element)
+                            options = await self._extract_options_enhanced(element, control_type, element_id)
+                            
+                            form_element = FormElement(
+                                label=label,
+                                id_of_input_component=element_id,
+                                required=required,
+                                type_of_input=control_type,
+                                options=options,
+                                user_data_select_values=options[:1] if options else [],
+                                page_url=page_info.url,
+                                page_title=page_info.title
+                            )
+                            
+                            form_elements.append(form_element)
+                            print(f"      ✅ Extracted: {label} ({element_id}) - {control_type}")
+                            
+                except Exception as e:
+                    print(f"      Error with selector {selector}: {str(e)}")
+                    continue
+            
+            # If we still don't have many elements, try the regular extraction as fallback
+            if len(form_elements) < 3:
+                print("    🔍 Few elements found, trying regular extraction as fallback...")
+                regular_forms = await self._extract_page_forms(page, page_info)
+                form_elements.extend(regular_forms)
+            
+            print(f"    ✅ Total voluntary disclosure elements extracted: {len(form_elements)}")
+            return form_elements
+            
+        except Exception as e:
+            print(f"    ❌ Error in voluntary disclosures extraction: {str(e)}")
+            # Fallback to regular extraction
+            return await self._extract_page_forms(page, page_info)
+    
+    async def _handle_step_specific_actions(self, page: Page, step_name: str):
+        """Handle specific actions for different steps based on progress bar"""
+        try:
+            step_name_lower = step_name.lower()
+            
+            # Handle My Information step - fill forms
+            if 'information' in step_name_lower or 'personal' in step_name_lower:
+                print(f"    🎯 Detected '{step_name}' step - filling forms...")
+                await self._handle_information_step_actions(page)
+            
+            # Handle My Experience step - upload CV
+            elif 'experience' in step_name_lower or 'work' in step_name_lower:
+                print(f"    📊 Detected '{step_name}' step - handling CV upload...")
+                await self._handle_experience_step_actions(page)
+            
+            # Handle Voluntary Disclosures step - fill ethnicity, gender, veteran status
+            elif 'voluntary' in step_name_lower or 'disclosure' in step_name_lower or 'eeo' in step_name_lower:
+                print(f"    📊 Detected '{step_name}' step - handling voluntary disclosures...")
+                await self._handle_voluntary_disclosures_step_actions(page)
+            
+            # Handle Self Identity/Self Identify step - fill name and date
+            elif 'self' in step_name_lower and ('identity' in step_name_lower or 'identify' in step_name_lower):
+                print(f"    🆔 Detected '{step_name}' step - handling self identity...")
+                await self._handle_self_identity_step_actions(page)
+            
+            # Handle other steps - JSON extraction only
+            else:
+                print(f"    📄 Detected '{step_name}' step - JSON extraction completed")
+                
+        except Exception as e:
+            print(f"    ❌ Error handling step-specific actions for '{step_name}': {str(e)}")
+    
+    async def _handle_information_step_actions(self, page: Page):
+        """Handle actions specific to My Information step"""
+        try:
+            # Use DirectFormFiller to fill forms
+            direct_filler = DirectFormFiller()
+            filled_count = await direct_filler.fill_page_by_automation_id(page)
+            print(f"    ✅ Information step: {filled_count} fields filled")
+            
+        except Exception as e:
+            print(f"    ❌ Error handling information step actions: {str(e)}")
+    
+    async def _handle_experience_step_actions(self, page: Page):
+        """Handle actions specific to My Experience step"""
+        try:
+            # Use DirectFormFiller to handle CV upload
+            direct_filler = DirectFormFiller()
+            upload_success = await direct_filler.handle_experience_page_uploads(page)
+            
+            if upload_success:
+                print("    ✅ Experience step: CV upload completed successfully")
+            else:
+                print("    ⚠️ Experience step: CV upload completed with warnings")
+                
+        except Exception as e:
+            print(f"    ❌ Error handling experience step actions: {str(e)}")
+    
+    async def _handle_voluntary_disclosures_step_actions(self, page: Page):
+        """Handle actions specific to Voluntary Disclosures step"""
+        try:
+            # Use DirectFormFiller to handle voluntary disclosures
+            direct_filler = DirectFormFiller()
+            disclosure_success = await direct_filler.handle_voluntary_disclosures(page)
+            
+            if disclosure_success:
+                print("    ✅ Voluntary disclosures step: Fields filled successfully")
+            else:
+                print("    ⚠️ Voluntary disclosures step: Completed with warnings")
+                
+        except Exception as e:
+            print(f"    ❌ Error handling voluntary disclosures step actions: {str(e)}")
+    
+    async def _handle_self_identity_step_actions(self, page: Page):
+        """Handle actions specific to Self Identity step"""
+        try:
+            # Use DirectFormFiller to handle self identity fields
+            direct_filler = DirectFormFiller()
+            identity_success = await direct_filler.handle_self_identity_page(page)
+            
+            if identity_success:
+                print("    ✅ Self Identity step: Fields filled successfully")
+            else:
+                print("    ⚠️ Self Identity step: Completed with warnings")
+                
+        except Exception as e:
+            print(f"    ❌ Error handling self identity step actions: {str(e)}")
+    
+    async def _navigate_to_next_step(self, page: Page) -> bool:
+        """Navigate to the next step in the application"""
+        print("    ➡️ Looking for navigation to next step...")
+        
+        # Look for common navigation buttons
+        nav_selectors = [
+            'button:has-text("Next")',
+            'button:has-text("Continue")',
+            'button:has-text("Save and Continue")',
+            'button:has-text("Save & Continue")',
+            'a:has-text("Next")',
+            'a:has-text("Continue")',
+            '[data-automation-id*="next"]',
+            '[data-automation-id*="continue"]',
+            '[data-automation-id*="save"]',
+            'button[type="submit"]'
+        ]
+        
+        for selector in nav_selectors:
+            try:
+                element = await page.wait_for_selector(selector, timeout=3000, state='visible')
+                if element and not await element.is_disabled():
+                    nav_text = await element.inner_text()
+                    print(f"    ✅ Found navigation button: '{nav_text}'")
+                    await element.click()
+                    print("    🖱️ Clicked navigation button")
+                    return True
+            except:
+                continue
+        
+        print("    ℹ️ No navigation found")
+        return False
+    
+    async def _handle_page_specific_actions(self, page: Page, page_title: str):
+        """Handle specific actions for different page types after JSON extraction"""
+        try:
+            page_title_lower = page_title.lower()
+            
+            # Handle My Experience page - upload CV
+            if 'experience' in page_title_lower or 'work' in page_title_lower:
+                print(f"    🎯 Detected '{page_title}' page - handling CV upload...")
+                await self._handle_experience_page_actions(page)
+            
+            # Handle My Information page - already handled by DirectFormFiller above
+            elif 'information' in page_title_lower or 'personal' in page_title_lower:
+                print(f"    📋 Detected '{page_title}' page - form filling already handled")
+            
+            # Handle My Education page - JSON extraction only
+            elif 'education' in page_title_lower:
+                print(f"    🎓 Detected '{page_title}' page - JSON extraction completed")
+                await self._handle_education_page_actions(page)
+            
+            # Handle EEO page - JSON extraction only
+            elif 'eeo' in page_title_lower or 'equal' in page_title_lower:
+                print(f"    ⚖️ Detected '{page_title}' page - JSON extraction completed")
+                await self._handle_eeo_page_actions(page)
+            
+            # Handle Review page - JSON extraction only
+            elif 'review' in page_title_lower:
+                print(f"    📝 Detected '{page_title}' page - JSON extraction completed")
+                await self._handle_review_page_actions(page)
+            
+            # Handle Voluntary Self-Identification pages
+            elif 'voluntary' in page_title_lower or 'self-identification' in page_title_lower:
+                print(f"    📊 Detected '{page_title}' page - JSON extraction completed")
+                await self._handle_voluntary_page_actions(page)
+            
+            # Handle any other application pages
+            else:
+                print(f"    📄 Detected '{page_title}' page - JSON extraction completed")
+                await self._handle_generic_page_actions(page, page_title)
+                
+        except Exception as e:
+            print(f"    ❌ Error handling page-specific actions for '{page_title}': {str(e)}")
+    
+    async def _handle_experience_page_actions(self, page: Page):
+        """Handle actions specific to My Experience page"""
+        try:
+            # Use DirectFormFiller to handle CV upload
+            direct_filler = DirectFormFiller()
+            upload_success = await direct_filler.handle_experience_page_uploads(page)
+            
+            if upload_success:
+                print("    ✅ Experience page actions completed successfully")
+            else:
+                print("    ⚠️ Experience page actions completed with warnings")
+                
+        except Exception as e:
+            print(f"    ❌ Error handling experience page actions: {str(e)}")
+    
+    async def _handle_education_page_actions(self, page: Page):
+        """Handle actions specific to My Education page"""
+        try:
+            print("    📚 Processing My Education page - JSON extraction completed")
+            # Education page typically only needs JSON extraction
+            # Could add specific education form handling here if needed
+            
+        except Exception as e:
+            print(f"    ❌ Error handling education page actions: {str(e)}")
+    
+    async def _handle_eeo_page_actions(self, page: Page):
+        """Handle actions specific to EEO page"""
+        try:
+            print("    ⚖️ Processing EEO page - JSON extraction completed")
+            # EEO page typically only needs JSON extraction
+            # Could add specific EEO form handling here if needed
+            
+        except Exception as e:
+            print(f"    ❌ Error handling EEO page actions: {str(e)}")
+    
+    async def _handle_review_page_actions(self, page: Page):
+        """Handle actions specific to Review page"""
+        try:
+            print("    📝 Processing Review page - JSON extraction completed")
+            # Review page typically only needs JSON extraction
+            # This is usually the final review before submission
+            
+        except Exception as e:
+            print(f"    ❌ Error handling review page actions: {str(e)}")
+    
+    async def _handle_voluntary_page_actions(self, page: Page):
+        """Handle actions specific to Voluntary Self-Identification pages"""
+        try:
+            print("    📊 Processing Voluntary Self-Identification page - JSON extraction completed")
+            # Voluntary pages typically only need JSON extraction
+            # Could add specific voluntary form handling here if needed
+            
+        except Exception as e:
+            print(f"    ❌ Error handling voluntary page actions: {str(e)}")
+    
+    async def _handle_generic_page_actions(self, page: Page, page_title: str):
+        """Handle actions for any other application pages"""
+        try:
+            print(f"    📄 Processing '{page_title}' page - JSON extraction completed")
+            # Generic pages only need JSON extraction
+            # This handles any other pages not specifically categorized
+            
+        except Exception as e:
+            print(f"    ❌ Error handling generic page actions for '{page_title}': {str(e)}")
+    
+    async def _process_redirected_page(self, page: Page):
+        """Process the page after automatic redirection (typically My Experience)"""
+        try:
+            # Get current page info
+            current_url = page.url
+            page_title = await page.title()
+            
+            print(f"  📋 Processing redirected page: {page_title}")
+            print(f"  🌐 URL: {current_url}")
+            
+            # Check if we've already processed this page
             page_identifier = await self._get_page_identifier(page)
-            
-            # Check if we've already processed this specific page content
             if page_identifier in self.extracted_pages:
                 print(f"  ℹ️ Already processed this page content: {page_identifier}")
                 return
             
-            page_title = await page.title()
+            # Create page info
             page_info = PageInfo(
                 url=current_url,
                 path=current_url.replace(self.tenant_url, '') or '/',
                 title=page_title,
-                page_type="My Information",
+                page_type=self._determine_page_type_from_title(page_title),
                 visited=True
             )
             
-            # Step 1: Extract form elements from My Information page
+            # Extract form elements from current page
             page_forms = await self._extract_page_forms(page, page_info)
             page_info.form_count = len(page_forms)
             self.form_elements.extend(page_forms)
             self.discovered_pages.append(page_info)
             self.extracted_pages.add(page_identifier)  # Mark as processed
             
-            print(f"  ✅ Extracted {len(page_forms)} form elements from My Information page")
+            print(f"  ✅ Extracted {len(page_forms)} form elements from '{page_info.page_type}' page")
             
-            # Step 2: Fill all form fields with CV data using direct form filler
-            print("  🎯 Using direct form filler to identify and fill fields by data-automation-id...")
+            # Save current results to JSON after extraction
+            print("  💾 Saving extracted form data to JSON...")
+            current_results = await self._create_results()
+            await self._save_results(current_results)
+            print("  ✅ Form data saved to JSON")
             
-            # Use direct form filler - identifies input areas by data-automation-id
-            direct_filler = DirectFormFiller()
-            filled_count = await direct_filler.fill_page_by_automation_id(page)
-            print(f"  ✅ Direct filler completed: {filled_count} fields filled")
+            # Handle page-specific actions (like CV upload for My Experience)
+            await self._handle_page_specific_actions(page, page_title)
             
-            # Submit the form using direct method
-            print("  🚀 Submitting My Information form...")
-            submit_success = await direct_filler.submit_form(page)
-            
-            if submit_success:
-                print("  ✅ My Information form submitted successfully")
-            else:
-                print("  ⚠️ Failed to submit My Information form")
-            
-            # Look for additional sections or pages within My Information
-            await self._navigate_my_information_sections(page)
+            # Try to continue to next page
+            await self._try_continue_to_next_page(page)
             
         except Exception as e:
-            self.errors.append(f"Error processing My Information page: {str(e)}")
-            print(f"  ❌ Error processing My Information page: {str(e)}")
+            self.errors.append(f"Error processing redirected page: {str(e)}")
+            print(f"  ❌ Error processing redirected page: {str(e)}")
     
+    def _determine_page_type_from_title(self, title: str) -> str:
+        """Determine page type from title"""
+        title_lower = title.lower()
+        
+        if 'information' in title_lower or 'personal' in title_lower:
+            return "My Information"
+        elif 'experience' in title_lower or 'work' in title_lower:
+            return "My Experience"
+        elif 'education' in title_lower:
+            return "My Education"
+        elif 'review' in title_lower:
+            return "Review"
+        elif 'eeo' in title_lower or 'equal' in title_lower:
+            return "EEO"
+        else:
+            return "Application Page"
+    
+    async def _try_continue_to_next_page(self, page: Page):
+        """Try to continue to the next page in the application flow"""
+        print("  ➡️ Looking for navigation to continue...")
+        
+        # Look for common navigation buttons
+        nav_selectors = [
+            'button:has-text("Next")',
+            'button:has-text("Continue")',
+            'button:has-text("Save and Continue")',
+            'button:has-text("Save & Continue")',
+            'a:has-text("Next")',
+            'a:has-text("Continue")',
+            '[data-automation-id*="next"]',
+            '[data-automation-id*="continue"]',
+            '[data-automation-id*="save"]'
+        ]
+        
+        for selector in nav_selectors:
+            try:
+                element = await page.wait_for_selector(selector, timeout=3000, state='visible')
+                if element and not await element.is_disabled():
+                    nav_text = await element.inner_text()
+                    print(f"  ✅ Found navigation button: '{nav_text}'")
+                    await element.click()
+                    print("  🖱️ Clicked navigation button")
+                    
+                    # Wait for next page to load
+                    await page.wait_for_load_state("networkidle", timeout=10000)
+                    await asyncio.sleep(3)
+                    
+                    # Recursively process the next page
+                    await self._process_redirected_page(page)
+                    return
+            except:
+                continue
+        
+        print("  ℹ️ No navigation found - application flow may be complete")
 
     
     def _get_field_value_for_my_info(self, field_id: str, field_type: str, form_element: FormElement) -> str:
