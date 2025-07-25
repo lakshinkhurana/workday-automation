@@ -22,17 +22,20 @@ An automated form filling system for Workday job applications that streamlines t
 ## 🛠️ Installation
 
 1. Clone the repository:
+
 ```bash
 git clone <repository-url>
 cd workday-automation
 ```
 
 2. Install required dependencies:
+
 ```bash
 pip install playwright python-dotenv
 ```
 
 3. Install Playwright browsers:
+
 ```bash
 playwright install chromium
 ```
@@ -175,7 +178,7 @@ Enable detailed logging by checking the console output. The system provides:
 This project is for educational and personal use only. Please ensure compliance with:
 
 - Website terms of service
-- Company application policies  
+- Company application policies
 - Applicable laws and regulations
 
 ## 📝 License
