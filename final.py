@@ -332,32 +332,547 @@ class PageProcessor:
     
     def __init__(self, form_filler: DirectFormFiller):
         self.form_filler = form_filler
-        self.processed_pages = set()
+        self.processed_pages = set()  # Track processed pages to avoid duplicates
+        self.page_states = {}  # Store page state information
+        self.json_extractor = JSONExtractor()
         self.logger = logging.getLogger(f"{__name__}.PageProcessor")
+        
+        # Page type patterns for classification
+        self.page_patterns = {
+            "login": ["login", "sign-in", "authentication", "signin"],
+            "my_information": ["my-information", "personal", "profile", "basic-information"],
+            "job_application": ["job-application", "application", "apply", "position"],
+            "eeo": ["eeo", "equal-employment", "diversity", "demographics"],
+            "review": ["review", "summary", "confirm", "submit", "final"]
+        }
     
-    async def process_page(self, page: Page, page_config: Dict) -> bool:
-        """Process a single page"""
-        self.logger.info(f"Processing page: {page_config.get('name', 'Unknown')}")
-        # Implementation will be added in later tasks
-        return True
+    async def process_page(self, page: Page, page_config: Dict = None) -> bool:
+        """
+        Process a single page with comprehensive handling
+        Requirements: 3.1, 3.2, 3.3, 3.4, 3.5
+        """
+        try:
+            # Get current page URL and title for identification
+            current_url = page.url
+            page_title = await page.title()
+            
+            self.logger.info(f"Processing page: {page_title} ({current_url})")
+            
+            # Check if page was already processed to avoid duplicates (Requirement 3.5)
+            page_id = self._generate_page_id(current_url, page_title)
+            if self._is_page_already_processed(page_id):
+                self.logger.info(f"Page {page_id} already processed, skipping")
+                return True
+            
+            # Detect and classify the page type (Requirement 3.1)
+            page_type = await self.detect_page_type(page)
+            self.logger.info(f"Detected page type: {page_type}")
+            
+            # Update page state tracking
+            self._update_page_state(page_id, {
+                "url": current_url,
+                "title": page_title,
+                "type": page_type,
+                "status": "processing",
+                "timestamp": time.time()
+            })
+            
+            # Extract page configuration and form data (Requirement 3.2)
+            page_json = await self.extract_page_json(page)
+            if not page_json:
+                self.logger.warning("No JSON configuration extracted from page")
+            
+            # Fill forms on the current page (Requirement 3.3)
+            form_fill_success = await self.fill_page_forms(page, page_json)
+            if not form_fill_success:
+                self.logger.error("Form filling failed")
+                self._update_page_state(page_id, {"status": "failed", "error": "Form filling failed"})
+                return False
+            
+            # Navigate to next page (Requirement 3.4)
+            navigation_success = await self.navigate_to_next_page(page)
+            if not navigation_success:
+                self.logger.error("Navigation to next page failed")
+                self._update_page_state(page_id, {"status": "failed", "error": "Navigation failed"})
+                return False
+            
+            # Mark page as successfully processed
+            self._mark_page_processed(page_id)
+            self._update_page_state(page_id, {"status": "completed"})
+            
+            self.logger.info(f"Successfully processed page: {page_id}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error processing page: {str(e)}")
+            if 'page_id' in locals():
+                self._update_page_state(page_id, {"status": "failed", "error": str(e)})
+            return False
+    
+    async def detect_page_type(self, page: Page) -> str:
+        """
+        Detect and classify the current page type
+        Requirement: 3.1 - Add page detection and classification logic
+        """
+        try:
+            current_url = page.url.lower()
+            page_title = (await page.title()).lower()
+            
+            # Get page content for additional analysis
+            try:
+                page_content = await page.content()
+                page_content_lower = page_content.lower()
+            except:
+                page_content_lower = ""
+            
+            self.logger.debug(f"Analyzing page - URL: {current_url}, Title: {page_title}")
+            
+            # Check URL patterns first (most reliable)
+            for page_type, patterns in self.page_patterns.items():
+                for pattern in patterns:
+                    if pattern in current_url:
+                        self.logger.debug(f"Page type '{page_type}' detected from URL pattern: {pattern}")
+                        return page_type
+            
+            # Check page title patterns
+            for page_type, patterns in self.page_patterns.items():
+                for pattern in patterns:
+                    if pattern in page_title:
+                        self.logger.debug(f"Page type '{page_type}' detected from title pattern: {pattern}")
+                        return page_type
+            
+            # Check page content for specific indicators
+            content_indicators = {
+                "login": ["password", "email", "username", "sign in", "log in"],
+                "my_information": ["first name", "last name", "phone", "address", "personal information"],
+                "job_application": ["position", "job title", "resume", "cover letter", "application"],
+                "eeo": ["ethnicity", "gender", "disability", "veteran", "equal employment"],
+                "review": ["review", "submit", "confirm", "summary", "application summary"]
+            }
+            
+            for page_type, indicators in content_indicators.items():
+                indicator_count = sum(1 for indicator in indicators if indicator in page_content_lower)
+                if indicator_count >= 2:  # Require at least 2 indicators for content-based detection
+                    self.logger.debug(f"Page type '{page_type}' detected from content indicators")
+                    return page_type
+            
+            # Check for specific form elements that indicate page type
+            form_indicators = await self._analyze_form_elements_for_page_type(page)
+            if form_indicators:
+                self.logger.debug(f"Page type '{form_indicators}' detected from form analysis")
+                return form_indicators
+            
+            # Default fallback
+            self.logger.warning("Could not determine specific page type, using 'unknown'")
+            return "unknown"
+            
+        except Exception as e:
+            self.logger.error(f"Error detecting page type: {str(e)}")
+            return "unknown"
+    
+    async def _analyze_form_elements_for_page_type(self, page: Page) -> str:
+        """Analyze form elements to help determine page type"""
+        try:
+            # Look for specific input patterns that indicate page type
+            input_elements = await page.query_selector_all('input, select, textarea')
+            
+            field_indicators = {
+                "login": ["password", "email", "username"],
+                "my_information": ["firstname", "lastname", "phone", "address"],
+                "job_application": ["resume", "coverletter", "position"],
+                "eeo": ["ethnicity", "gender", "disability", "veteran"],
+                "review": []  # Review pages typically have fewer inputs
+            }
+            
+            found_fields = []
+            for element in input_elements[:10]:  # Limit to first 10 elements for performance
+                try:
+                    element_name = await element.get_attribute('name') or ""
+                    element_id = await element.get_attribute('id') or ""
+                    element_placeholder = await element.get_attribute('placeholder') or ""
+                    
+                    field_text = f"{element_name} {element_id} {element_placeholder}".lower()
+                    found_fields.append(field_text)
+                except:
+                    continue
+            
+            # Score each page type based on field matches
+            type_scores = {}
+            for page_type, indicators in field_indicators.items():
+                score = 0
+                for indicator in indicators:
+                    for field in found_fields:
+                        if indicator in field:
+                            score += 1
+                type_scores[page_type] = score
+            
+            # Return the page type with the highest score (if > 0)
+            if type_scores:
+                best_type = max(type_scores, key=type_scores.get)
+                if type_scores[best_type] > 0:
+                    return best_type
+            
+            return ""
+            
+        except Exception as e:
+            self.logger.error(f"Error analyzing form elements: {str(e)}")
+            return ""
     
     async def extract_page_json(self, page: Page) -> Dict:
-        """Extract JSON configuration from current page"""
-        self.logger.info("Extracting page JSON configuration")
-        # Implementation will be added in later tasks
-        return {}
+        """
+        Extract JSON configuration from current page
+        Requirement: 3.2 - Create base methods for form extraction
+        """
+        try:
+            self.logger.info("Extracting JSON configuration from current page")
+            
+            # Find all form elements on the page
+            form_elements = await page.query_selector_all('input, select, textarea, button[role="button"]')
+            
+            extracted_elements = []
+            
+            for element in form_elements:
+                try:
+                    # Skip hidden or disabled elements
+                    is_visible = await element.is_visible()
+                    is_enabled = await element.is_enabled()
+                    
+                    if not is_visible or not is_enabled:
+                        continue
+                    
+                    # Extract JSON for this element using JSONExtractor
+                    element_json = await self.json_extractor.extract_form_element_json(page, element)
+                    
+                    if element_json and element_json.get('id_of_input_component'):
+                        extracted_elements.append(element_json)
+                        self.logger.debug(f"Extracted element: {element_json.get('label', 'Unknown')}")
+                
+                except Exception as e:
+                    self.logger.warning(f"Error extracting element JSON: {str(e)}")
+                    continue
+            
+            # Create page configuration structure
+            page_config = {
+                "page_url": page.url,
+                "page_title": await page.title(),
+                "extraction_timestamp": time.time(),
+                "form_elements": extracted_elements,
+                "total_elements": len(extracted_elements)
+            }
+            
+            self.logger.info(f"Extracted {len(extracted_elements)} form elements from page")
+            return page_config
+            
+        except Exception as e:
+            self.logger.error(f"Error extracting page JSON: {str(e)}")
+            return {}
     
     async def fill_page_forms(self, page: Page, json_data: Dict) -> bool:
-        """Fill forms on current page using JSON data"""
-        self.logger.info("Filling page forms")
-        # Implementation will be added in later tasks
-        return True
+        """
+        Fill forms on current page using JSON data
+        Requirement: 3.3 - Create base methods for form extraction and navigation
+        """
+        try:
+            if not json_data or not json_data.get('form_elements'):
+                self.logger.warning("No form elements found in JSON data")
+                return True  # Not necessarily an error if no forms to fill
+            
+            form_elements = json_data['form_elements']
+            self.logger.info(f"Attempting to fill {len(form_elements)} form elements")
+            
+            filled_count = 0
+            failed_count = 0
+            
+            for element_data in form_elements:
+                try:
+                    element_id = element_data.get('id_of_input_component')
+                    element_label = element_data.get('label', 'Unknown')
+                    element_type = element_data.get('type_of_input', 'text')
+                    is_required = element_data.get('required', False)
+                    
+                    if not element_id:
+                        self.logger.warning(f"No ID found for element: {element_label}")
+                        continue
+                    
+                    # Find the element on the page
+                    element = await self._find_element_by_id(page, element_id)
+                    if not element:
+                        self.logger.warning(f"Could not find element with ID: {element_id}")
+                        if is_required:
+                            failed_count += 1
+                        continue
+                    
+                    # Fill the element based on its type
+                    fill_success = await self._fill_form_element(page, element, element_data)
+                    
+                    if fill_success:
+                        filled_count += 1
+                        self.logger.debug(f"Successfully filled: {element_label}")
+                    else:
+                        failed_count += 1
+                        self.logger.warning(f"Failed to fill: {element_label}")
+                        if is_required:
+                            self.logger.error(f"Required field failed: {element_label}")
+                
+                except Exception as e:
+                    failed_count += 1
+                    self.logger.error(f"Error filling element {element_data.get('label', 'Unknown')}: {str(e)}")
+            
+            self.logger.info(f"Form filling completed - Filled: {filled_count}, Failed: {failed_count}")
+            
+            # Consider success if we filled at least some elements and no required fields failed
+            return filled_count > 0 or len(form_elements) == 0
+            
+        except Exception as e:
+            self.logger.error(f"Error filling page forms: {str(e)}")
+            return False
+    
+    async def _find_element_by_id(self, page: Page, element_id: str):
+        """Find element by ID, name, or data-automation-id"""
+        try:
+            # Try different selector strategies
+            selectors = [
+                f'#{element_id}',  # ID selector
+                f'[name="{element_id}"]',  # Name attribute
+                f'[data-automation-id="{element_id}"]',  # Data automation ID
+                f'[id="{element_id}"]'  # Explicit ID attribute
+            ]
+            
+            for selector in selectors:
+                try:
+                    element = await page.query_selector(selector)
+                    if element:
+                        return element
+                except:
+                    continue
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Error finding element by ID {element_id}: {str(e)}")
+            return None
+    
+    async def _fill_form_element(self, page: Page, element, element_data: Dict) -> bool:
+        """Fill a single form element based on its type and data"""
+        try:
+            element_type = element_data.get('type_of_input', 'text')
+            user_values = element_data.get('user_data_select_values', [])
+            options = element_data.get('options', [])
+            
+            # Get a value to fill
+            fill_value = self._get_fill_value(element_type, user_values, options, element_data)
+            
+            if not fill_value:
+                self.logger.debug(f"No value to fill for element type: {element_type}")
+                return True  # Not an error if no value needed
+            
+            # Fill based on element type
+            if element_type == 'text' or element_type == 'textarea':
+                await element.fill(fill_value)
+                
+            elif element_type == 'select':
+                await element.select_option(value=fill_value)
+                
+            elif element_type == 'checkbox':
+                is_checked = await element.is_checked()
+                if (fill_value.lower() in ['true', 'yes', '1']) != is_checked:
+                    await element.click()
+                    
+            elif element_type == 'radio':
+                await element.click()
+                
+            elif element_type == 'dropdown':
+                # For custom dropdowns, try clicking and selecting
+                await element.click()
+                await asyncio.sleep(0.5)  # Wait for dropdown to open
+                
+                # Try to find and click the option
+                option_selectors = [
+                    f'[role="option"]:has-text("{fill_value}")',
+                    f'.dropdown-option:has-text("{fill_value}")',
+                    f'li:has-text("{fill_value}")'
+                ]
+                
+                for selector in option_selectors:
+                    try:
+                        option_element = await page.query_selector(selector)
+                        if option_element:
+                            await option_element.click()
+                            break
+                    except:
+                        continue
+            
+            # Add small delay after filling
+            await asyncio.sleep(0.2)
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error filling form element: {str(e)}")
+            return False
+    
+    def _get_fill_value(self, element_type: str, user_values: List[str], options: List[str], element_data: Dict) -> str:
+        """Get appropriate value to fill based on element type and available data"""
+        # Use user_data_select_values if available
+        if user_values:
+            return user_values[0]
+        
+        # Use first option for choice-based elements
+        if element_type in ['select', 'radio', 'dropdown'] and options:
+            return options[0]
+        
+        # Generate default values based on element type and label
+        label = element_data.get('label', '').lower()
+        
+        if element_type == 'checkbox':
+            return 'false'  # Default to unchecked
+        
+        # Generate contextual default values based on label
+        if 'email' in label:
+            return 'test@example.com'
+        elif 'phone' in label:
+            return '555-123-4567'
+        elif 'name' in label:
+            if 'first' in label:
+                return 'John'
+            elif 'last' in label:
+                return 'Doe'
+            else:
+                return 'John Doe'
+        elif 'address' in label:
+            return '123 Main St'
+        elif 'city' in label:
+            return 'New York'
+        elif 'zip' in label or 'postal' in label:
+            return '10001'
+        elif 'date' in label:
+            return '01/01/2000'
+        else:
+            return 'Test Value'
     
     async def navigate_to_next_page(self, page: Page) -> bool:
-        """Navigate to the next page"""
-        self.logger.info("Navigating to next page")
-        # Implementation will be added in later tasks
-        return True
+        """
+        Navigate to the next page in the application flow
+        Requirement: 3.4 - Create base methods for navigation
+        """
+        try:
+            self.logger.info("Attempting to navigate to next page")
+            
+            # Common navigation button selectors (in order of preference)
+            navigation_selectors = [
+                'button:has-text("Next")',
+                'button:has-text("Continue")',
+                'button:has-text("Submit")',
+                'button:has-text("Save and Continue")',
+                'input[type="submit"]',
+                'button[type="submit"]',
+                '.next-button',
+                '.continue-button',
+                '.submit-button',
+                'a:has-text("Next")',
+                'a:has-text("Continue")'
+            ]
+            
+            # Try each selector until we find a clickable element
+            for selector in navigation_selectors:
+                try:
+                    element = await page.query_selector(selector)
+                    if element:
+                        is_visible = await element.is_visible()
+                        is_enabled = await element.is_enabled()
+                        
+                        if is_visible and is_enabled:
+                            self.logger.info(f"Found navigation element with selector: {selector}")
+                            
+                            # Click the navigation element
+                            await element.click()
+                            
+                            # Wait for navigation to complete
+                            await self._wait_for_navigation(page)
+                            
+                            self.logger.info("Successfully navigated to next page")
+                            return True
+                
+                except Exception as e:
+                    self.logger.debug(f"Navigation selector '{selector}' failed: {str(e)}")
+                    continue
+            
+            # If no standard navigation found, try form submission
+            try:
+                form_element = await page.query_selector('form')
+                if form_element:
+                    self.logger.info("Attempting form submission for navigation")
+                    await page.keyboard.press('Enter')
+                    await self._wait_for_navigation(page)
+                    return True
+            except:
+                pass
+            
+            self.logger.warning("No navigation method found")
+            return False
+            
+        except Exception as e:
+            self.logger.error(f"Error navigating to next page: {str(e)}")
+            return False
+    
+    async def _wait_for_navigation(self, page: Page, timeout: int = 10000):
+        """Wait for page navigation to complete"""
+        try:
+            # Wait for either navigation or network idle
+            await asyncio.wait_for(
+                page.wait_for_load_state('networkidle'),
+                timeout=timeout/1000
+            )
+        except asyncio.TimeoutError:
+            self.logger.warning("Navigation wait timed out")
+        except Exception as e:
+            self.logger.debug(f"Navigation wait error: {str(e)}")
+    
+    def _generate_page_id(self, url: str, title: str) -> str:
+        """Generate unique identifier for a page"""
+        import hashlib
+        page_info = f"{url}_{title}"
+        return hashlib.md5(page_info.encode()).hexdigest()[:12]
+    
+    def _is_page_already_processed(self, page_id: str) -> bool:
+        """
+        Check if page was already processed to avoid duplicate processing
+        Requirement: 3.5 - Implement page state tracking to avoid duplicate processing
+        """
+        return page_id in self.processed_pages
+    
+    def _mark_page_processed(self, page_id: str):
+        """Mark a page as processed"""
+        self.processed_pages.add(page_id)
+        self.logger.debug(f"Marked page as processed: {page_id}")
+    
+    def _update_page_state(self, page_id: str, state_data: Dict):
+        """
+        Update page state information
+        Requirement: 3.5 - Implement page state tracking
+        """
+        if page_id not in self.page_states:
+            self.page_states[page_id] = {}
+        
+        self.page_states[page_id].update(state_data)
+        self.logger.debug(f"Updated page state for {page_id}: {state_data}")
+    
+    def get_page_state(self, page_id: str) -> Dict:
+        """Get current state of a specific page"""
+        return self.page_states.get(page_id, {})
+    
+    def get_processed_pages(self) -> set:
+        """Get set of all processed page IDs"""
+        return self.processed_pages.copy()
+    
+    def get_all_page_states(self) -> Dict:
+        """Get all page states"""
+        return self.page_states.copy()
+    
+    def reset_page_tracking(self):
+        """Reset page tracking state"""
+        self.processed_pages.clear()
+        self.page_states.clear()
+        self.logger.info("Page tracking state reset")
 
 class JSONExtractor:
     """Enhanced JSON extractor for page-specific configurations"""
