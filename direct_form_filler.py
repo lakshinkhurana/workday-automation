@@ -28,13 +28,13 @@ class DirectFormFiller:
         # Direct mapping of field id to environment variable
         self.field_mappings = {
             # My Information page fields
-            'name--legalName--firstName': os.getenv('REGISTRATION_FIRST_NAME', ''),
-            'name--legalName--lastName': os.getenv('REGISTRATION_LAST_NAME', ''),
-            'email': os.getenv('REGISTRATION_EMAIL', ''),
-            'phoneNumber--phoneNumber': os.getenv('REGISTRATION_PHONE', ''),
+            # 'name--legalName--firstName': os.getenv('REGISTRATION_FIRST_NAME', ''),
+            # 'name--legalName--lastName': os.getenv('REGISTRATION_LAST_NAME', ''),
+            # 'email': os.getenv('REGISTRATION_EMAIL', ''),
+            # 'phoneNumber--phoneNumber': os.getenv('REGISTRATION_PHONE', ''),
             'phoneNumber--phoneDeviceType': 'Home',
-            'phoneNumber--countryPhoneCode': '+1',
-            'phoneNumber--extension': '',
+            # 'phoneNumber--countryPhoneCode': '+1',
+            # 'phoneNumber--extension': '',
             'country--country': 'United States',
             'source--source': os.getenv('JOB_BOARD',''),
             'candidateIsPreviousWorker': 'No',
@@ -56,22 +56,22 @@ class DirectFormFiller:
             # 'dateSectionYear-input': today_year,
             
             # Professional fields
-            'currentCompany': os.getenv('CURRENT_COMPANY', ''),
-            'currentRole': os.getenv('CURRENT_ROLE', ''),
-            'workExperience': os.getenv('YEARS_EXPERIENCE', ''),
-            'skills': os.getenv('PRIMARY_SKILLS', ''),
-            'education': os.getenv('EDUCATION_MASTERS', ''),
-            'github': os.getenv('GITHUB_URL', ''),
-            'workAuthorization': 'Yes',
-            'visaStatus': 'US Citizen',
+            # 'currentCompany': os.getenv('CURRENT_COMPANY', ''),
+            # 'currentRole': os.getenv('CURRENT_ROLE', ''),
+            # 'workExperience': os.getenv('YEARS_EXPERIENCE', ''),
+            # 'skills': os.getenv('PRIMARY_SKILLS', ''),
+            # 'education': os.getenv('EDUCATION_MASTERS', ''),
+            # 'github': os.getenv('GITHUB_URL', ''),
+            # 'workAuthorization': 'Yes',
+            # 'visaStatus': 'US Citizen',
             'requiresSponsorship': 'No',
 
             # Personal info with button dropdown support
             'personalInfoPerson--gender': 'Female', 
             'personalInfoUS--gender':'Female', # This will use button dropdown handler
-            'personalInfoUS--ethnicity': os.getenv('ETHNICITY', 'Prefer not to disclose'),
-            'personalInfoUS--veteranStatus': os.getenv('VETERAN_STATUS', 'I am not a protected veteran'),
-            'personalInfoUS--disability': os.getenv('DISABILITY_STATUS', 'I don\'t wish to answer'),
+            'personalInfoUS--ethnicity': os.getenv('ETHNICITY', 'Asian'),
+            'personalInfoUS--veteranStatus': os.getenv('VETERAN_STATUS', 'I AM NOT A VETERAN'),
+            'personalInfoUS--disability': os.getenv('DISABILITY_STATUS', ''),
             
             # Terms and Conditions checkbox
             'termsAndConditions--acceptTermsAndAgreements': 'true',
@@ -827,102 +827,67 @@ class DirectFormFiller:
       print("    🔲 Handling disability status checkboxes...")
     
       try:
-          # Define the preferred option to select (prioritize "I do not want to answer")
-          preferred_option = "I do not want to answer"
-        
-          # Fallback options in order of preference
+          # Define all possible disability options in order of preference
           disability_options = [
-              "I do not want to answer"    
+              "I do not wish to answer",
+              "I do not want to answer",
+              "I prefer not to answer",
+              "Choose not to identify",
+              "Decline to answer",
+              "Prefer not to disclose",
+              "Do not wish to identify"
           ]
-        
-          checkboxes_found = 0
-        
-          # Look for all label elements that might contain disability options
-          labels = await page.query_selector_all('label')
-        
-          for label in labels:
+
+          # Try finding labels with specific text content
+          for option in disability_options:
             try:
-                if await label.is_visible():
-                    # Get the inner text of the label
-                    label_text = await label.inner_text()
-                    label_text = label_text.strip()
+                # Use text content selectors
+                label_selectors = [
+                    f'label:has-text("{option}")',
+                    f'[role="radio"]:has-text("{option}")',
+                    f'div[role="radio"]:has-text("{option}")',
+                    f'div:has-text("{option}") >> role=radio',
+                    f'text="{option}"'
+                ]
+
+                for selector in label_selectors:
+                    print(f"      🔍 Looking for: '{selector}'")
+                    element = await page.query_selector(selector)
                     
-                    print(f"      🔍 Found label text: '{label_text}'")
-                    
-                    # Check if this label contains any of our target disability options
-                    # Process in order of preference (prefer not to answer first)
-                    for option in disability_options:
-                        if option.lower() in label_text.lower() or label_text.lower() in option.lower():
-                            print(f"      🎯 Matched disability option: '{option}'")
-                            
-                            # Check if there's an associated checkbox that's not already checked
-                            label_for = await label.get_attribute('for')
-                            if label_for:
-                                checkbox = await page.query_selector(f'input[id="{label_for}"]')
-                                if checkbox:
-                                    is_checked = await checkbox.is_checked()
-                                    if not is_checked:
-                                        # Click the label to select the option
-                                        await label.click()
-                                        print(f"      ✅ Clicked label for: '{label_text}'")
-                                        checkboxes_found += 1
-                                        return True  # Exit after first successful click
-                                    else:
-                                        print(f"      ℹ️ Option already selected: '{label_text}'")
-                            else:
-                                # If no 'for' attribute, try clicking the label directly
-                                await label.click()
-                                print(f"      ✅ Clicked label directly: '{label_text}'")
-                                checkboxes_found += 1
-                                return True  # Exit after first successful click
-                            
-                            break  # Break from disability_options loop once we find a match
-                            
+                    if element and await element.is_visible():
+                        # Try clicking the element
+                        await element.click()
+                        await asyncio.sleep(0.5)
+                        print(f"      ✅ Clicked option: '{option}'")
+                        return True
+
             except Exception as e:
-                print(f"      ⚠️ Error processing label: {str(e)}")
+                print(f"      ⚠️ Error processing option '{option}': {str(e)}")
                 continue
-        
-          # Alternative approach: look for labels with specific selectors
-          if checkboxes_found == 0:
-            print("    🔄 Trying alternative selectors...")
-            
-            alternative_selectors = [
-                'label[for*="disability"]',
-                'label[for*="disabilityStatus"]', 
-                'div[data-automation-id*="disability"] label',
-                'fieldset label',
-                'label:has-text("do not want")',
-                'label:has-text("prefer not")'
-            ]
-            
-            for selector in alternative_selectors:
-                try:
-                    labels = await page.query_selector_all(selector)
-                    for label in labels:
-                        if await label.is_visible():
-                            label_text = await label.inner_text()
-                            label_text = label_text.strip()
-                            
-                            print(f"      🔍 Alternative selector found: '{label_text}'")
-                            
-                            # Check if this matches any disability option (prioritize preferred)
-                            for option in disability_options:
-                                if option.lower() in label_text.lower() or label_text.lower() in option.lower():
-                                    await label.click()
-                                    print(f"      ✅ Clicked alternative label: '{label_text}'")
-                                    checkboxes_found += 1
-                                    return True
-                                    
-                except Exception as e:
-                    print(f"      ⚠️ Error with alternative selector {selector}: {str(e)}")
-                    continue
-        
-          if checkboxes_found > 0:
-            print(f"    ✅ Successfully handled disability checkbox selection")
-            return True
-          else:
-            print(f"    ⚠️ No matching disability options found")
-            return False
+
+          # Fallback: Try finding any visible radio buttons or labels with similar text
+          print("    🔄 Trying fallback approach...")
+          
+          labels = await page.query_selector_all('label, [role="radio"]')
+          for label in labels:
+              if await label.is_visible():
+                  try:
+                      label_text = await label.inner_text()
+                      label_text = label_text.strip().lower()
+                      
+                      # Check if label contains any of our keywords
+                      keywords = ["not", "decline", "prefer", "don't", "do not", "choose not"]
+                      if any(keyword in label_text for keyword in keywords):
+                          await label.click()
+                          await asyncio.sleep(0.5)
+                          print(f"      ✅ Clicked fallback option: '{label_text}'")
+                          return True
+                          
+                  except Exception as e:
+                      continue
+
+          print("    ⚠️ No matching disability options found")
+          return False
             
       except Exception as e:
         print(f"    ❌ Error handling disability checkboxes: {str(e)}")
@@ -1321,4 +1286,36 @@ class DirectFormFiller:
             
         except Exception as e:
             print(f"        Error verifying upload: {str(e)}")
+            return False
+
+    async def check_for_success_url(self, page) -> bool:
+        """Check if current URL matches the success URL"""
+        try:
+            # Get success URL from environment
+            success_url = os.getenv('WORKDAY_END_URL', '')
+            if not success_url:
+                print("  ⚠️ No success URL configured in environment")
+                return False
+
+            # Wait for URL to potentially change (max 10 seconds)
+            print("  🔍 Checking for successful completion URL...")
+            try:
+                await page.wait_for_url(success_url, timeout=10000)
+                print("  ✅ Success URL detected! Application completed successfully")
+                return True
+            except Exception:
+                current_url = page.url
+                print(f"  ℹ️ Current URL: {current_url}")
+                print(f"  ℹ️ Expected URL: {success_url}")
+                
+                # Check if current URL contains success URL components
+                if success_url.lower() in current_url.lower():
+                    print("  ✅ Success URL pattern detected! Application completed successfully")
+                    return True
+                
+                print("  ❌ Success URL not detected")
+                return False
+
+        except Exception as e:
+            print(f"  ❌ Error checking success URL: {str(e)}")
             return False
