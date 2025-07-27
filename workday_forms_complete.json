@@ -1,46 +1,52 @@
 {
   "extraction_metadata": {
-    "timestamp": "2025-07-26 01:42:51",
+    "timestamp": "2025-07-28 00:59:27",
     "tenant_url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite",
-    "total_pages_crawled": 6,
-    "total_form_elements": 34
+    "total_pages_crawled": 7,
+    "total_form_elements": 54
   },
   "pages_visited": [
     {
-      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-MA%2C-Westford/VLSI-Physical-Design-Engineer_JR1995574-1/apply/applyManually",
-      "title": "VLSI Physical Design Engineer",
+      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-CA%2C-Santa-Clara/Data-Analyst--Finance_JR1996671/apply/autofillWithResume",
+      "title": "Data Analyst, Finance",
       "page_type": "Job Application",
       "form_count": 7
     },
     {
-      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-MA%2C-Westford/VLSI-Physical-Design-Engineer_JR1995574-1/apply/applyManually",
-      "title": "current step 1 of 6\nMy Information - VLSI Physical Design Engineer",
-      "page_type": "current step 1 of 6\nMy Information",
-      "form_count": 15
+      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-CA%2C-Santa-Clara/Data-Analyst--Finance_JR1996671/apply/autofillWithResume",
+      "title": "Data Analyst, Finance - Data Analyst, Finance",
+      "page_type": "Data Analyst, Finance",
+      "form_count": 38
     },
     {
-      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-MA%2C-Westford/VLSI-Physical-Design-Engineer_JR1995574-1/apply/applyManually",
-      "title": "current step 2 of 6\nMy Experience - VLSI Physical Design Engineer",
-      "page_type": "current step 2 of 6\nMy Experience",
-      "form_count": 2
-    },
-    {
-      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-MA%2C-Westford/VLSI-Physical-Design-Engineer_JR1995574-1/apply/applyManually",
-      "title": "current step 3 of 6\nApplication Questions - VLSI Physical Design Engineer",
-      "page_type": "current step 3 of 6\nApplication Questions",
+      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-CA%2C-Santa-Clara/Data-Analyst--Finance_JR1996671/apply/autofillWithResume",
+      "title": "Data Analyst, Finance - Data Analyst, Finance",
+      "page_type": "Data Analyst, Finance",
       "form_count": 0
     },
     {
-      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-MA%2C-Westford/VLSI-Physical-Design-Engineer_JR1995574-1/apply/applyManually",
-      "title": "current step 4 of 6\nVoluntary Disclosures - VLSI Physical Design Engineer",
-      "page_type": "current step 4 of 6\nVoluntary Disclosures",
-      "form_count": 2
+      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-CA%2C-Santa-Clara/Data-Analyst--Finance_JR1996671/apply/autofillWithResume",
+      "title": "Data Analyst, Finance - Data Analyst, Finance",
+      "page_type": "Data Analyst, Finance",
+      "form_count": 1
     },
     {
-      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-MA%2C-Westford/VLSI-Physical-Design-Engineer_JR1995574-1/apply/applyManually",
-      "title": "current step 5 of 6\nSelf Identify - VLSI Physical Design Engineer",
-      "page_type": "current step 5 of 6\nSelf Identify",
+      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-CA%2C-Santa-Clara/Data-Analyst--Finance_JR1996671/apply/autofillWithResume",
+      "title": "Data Analyst, Finance - Data Analyst, Finance",
+      "page_type": "Data Analyst, Finance",
       "form_count": 8
+    },
+    {
+      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/jobTasks/completed/application",
+      "title": "Candidate Home - Candidate Home",
+      "page_type": "Candidate Home",
+      "form_count": 0
+    },
+    {
+      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/jobTasks/completed/application",
+      "title": "Candidate Home - Candidate Home",
+      "page_type": "Candidate Home",
+      "form_count": 0
     }
   ],
   "form_elements": [
@@ -101,21 +107,8 @@
       "user_data_select_values": []
     },
     {
-      "label": "Radio Group (candidateIsPreviousWorker)",
-      "id_of_input_component": "candidateIsPreviousWorker",
-      "required": false,
-      "type_of_input": "radio",
-      "options": [
-        "Yes",
-        "No"
-      ],
-      "user_data_select_values": [
-        "No"
-      ]
-    },
-    {
-      "label": "Search",
-      "id_of_input_component": "source--source",
+      "label": "Unlabeled Field",
+      "id_of_input_component": "workExperience-45--jobTitle",
       "required": true,
       "type_of_input": "text",
       "options": [],
@@ -123,23 +116,7 @@
     },
     {
       "label": "Unlabeled Field",
-      "id_of_input_component": "v0x44",
-      "required": false,
-      "type_of_input": "radio",
-      "options": [],
-      "user_data_select_values": []
-    },
-    {
-      "label": "Unlabeled Field",
-      "id_of_input_component": "v0x45",
-      "required": false,
-      "type_of_input": "radio",
-      "options": [],
-      "user_data_select_values": []
-    },
-    {
-      "label": "Unlabeled Field",
-      "id_of_input_component": "name--legalName--firstName",
+      "id_of_input_component": "workExperience-45--companyName",
       "required": true,
       "type_of_input": "text",
       "options": [],
@@ -147,23 +124,31 @@
     },
     {
       "label": "Unlabeled Field",
-      "id_of_input_component": "name--legalName--lastName",
-      "required": true,
+      "id_of_input_component": "workExperience-45--location",
+      "required": false,
       "type_of_input": "text",
       "options": [],
       "user_data_select_values": []
     },
     {
       "label": "Unlabeled Field",
-      "id_of_input_component": "name--preferredCheck",
+      "id_of_input_component": "workExperience-45--currentlyWorkHere",
       "required": false,
       "type_of_input": "checkbox",
       "options": [],
       "user_data_select_values": []
     },
     {
-      "label": "Unlabeled Field",
-      "id_of_input_component": "address--addressLine1",
+      "label": "Month",
+      "id_of_input_component": "dateSectionMonth-input",
+      "required": false,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Year",
+      "id_of_input_component": "dateSectionYear-input",
       "required": false,
       "type_of_input": "text",
       "options": [],
@@ -171,7 +156,31 @@
     },
     {
       "label": "Unlabeled Field",
-      "id_of_input_component": "address--city",
+      "id_of_input_component": "workExperience-45--roleDescription",
+      "required": false,
+      "type_of_input": "textarea",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "workExperience-46--jobTitle",
+      "required": true,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "workExperience-46--companyName",
+      "required": true,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "workExperience-46--location",
       "required": false,
       "type_of_input": "text",
       "options": [],
@@ -179,59 +188,203 @@
     },
     {
       "label": "Unlabeled Field",
-      "id_of_input_component": "address--postalCode",
+      "id_of_input_component": "workExperience-46--currentlyWorkHere",
       "required": false,
+      "type_of_input": "checkbox",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Month",
+      "id_of_input_component": "dateSectionMonth-input",
+      "required": false,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Year",
+      "id_of_input_component": "dateSectionYear-input",
+      "required": false,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Month",
+      "id_of_input_component": "dateSectionMonth-input",
+      "required": false,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Year",
+      "id_of_input_component": "dateSectionYear-input",
+      "required": false,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "workExperience-46--roleDescription",
+      "required": false,
+      "type_of_input": "textarea",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "workExperience-47--jobTitle",
+      "required": true,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "workExperience-47--companyName",
+      "required": true,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "workExperience-47--location",
+      "required": false,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "workExperience-47--currentlyWorkHere",
+      "required": false,
+      "type_of_input": "checkbox",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Month",
+      "id_of_input_component": "dateSectionMonth-input",
+      "required": false,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Year",
+      "id_of_input_component": "dateSectionYear-input",
+      "required": false,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Month",
+      "id_of_input_component": "dateSectionMonth-input",
+      "required": false,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Year",
+      "id_of_input_component": "dateSectionYear-input",
+      "required": false,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "workExperience-47--roleDescription",
+      "required": false,
+      "type_of_input": "textarea",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Unlabeled Field",
+      "id_of_input_component": "education-58--schoolName",
+      "required": true,
       "type_of_input": "text",
       "options": [],
       "user_data_select_values": []
     },
     {
       "label": "Search",
-      "id_of_input_component": "phoneNumber--countryPhoneCode",
-      "required": true,
+      "id_of_input_component": "education-58--fieldOfStudy",
+      "required": false,
       "type_of_input": "text",
       "options": [],
       "user_data_select_values": []
     },
     {
       "label": "Unlabeled Field",
-      "id_of_input_component": "phoneNumber--phoneNumber",
-      "required": true,
+      "id_of_input_component": "education-58--gradeAverage",
+      "required": false,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Year",
+      "id_of_input_component": "dateSectionYear-input",
+      "required": false,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Year",
+      "id_of_input_component": "dateSectionYear-input",
+      "required": false,
       "type_of_input": "text",
       "options": [],
       "user_data_select_values": []
     },
     {
       "label": "Unlabeled Field",
-      "id_of_input_component": "phoneNumber--extension",
+      "id_of_input_component": "education-59--schoolName",
+      "required": true,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Search",
+      "id_of_input_component": "education-59--fieldOfStudy",
       "required": false,
       "type_of_input": "text",
       "options": [],
       "user_data_select_values": []
     },
     {
-      "label": "Country United States of America Required",
-      "id_of_input_component": "country--country",
+      "label": "Unlabeled Field",
+      "id_of_input_component": "education-59--gradeAverage",
       "required": false,
-      "type_of_input": "select",
-      "options": [
-        "country--country"
-      ],
-      "user_data_select_values": [
-        "country--country"
-      ]
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
     },
     {
-      "label": "State Select One",
-      "id_of_input_component": "address--countryRegion",
+      "label": "Year",
+      "id_of_input_component": "dateSectionYear-input",
       "required": false,
-      "type_of_input": "select",
-      "options": [
-        "country--country"
-      ],
-      "user_data_select_values": [
-        "country--country"
-      ]
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
+    },
+    {
+      "label": "Year",
+      "id_of_input_component": "dateSectionYear-input",
+      "required": false,
+      "type_of_input": "text",
+      "options": [],
+      "user_data_select_values": []
     },
     {
       "label": "Search",
@@ -243,17 +396,17 @@
     },
     {
       "label": "Unlabeled Field",
-      "id_of_input_component": "socialNetworkAccounts--linkedInAccount",
-      "required": false,
+      "id_of_input_component": "webAddress-44--url",
+      "required": true,
       "type_of_input": "text",
       "options": [],
       "user_data_select_values": []
     },
     {
       "label": "Unlabeled Field",
-      "id_of_input_component": "termsAndConditions--acceptTermsAndAgreements",
-      "required": true,
-      "type_of_input": "checkbox",
+      "id_of_input_component": "socialNetworkAccounts--linkedInAccount",
+      "required": false,
+      "type_of_input": "text",
       "options": [],
       "user_data_select_values": []
     },
