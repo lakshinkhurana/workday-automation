@@ -1214,6 +1214,7 @@ class WorkdayFormScraper:
         
         # Use the same selectors as DirectFormFiller's _press_save_and_continue method
         save_continue_selectors = [
+            'button[data-automation-id="pageFooterNextButton"]',
             'button[data-automation-id="saveAndContinueButton"]',
             'button:has-text("Save and Continue")',
             'button:has-text("Save & Continue")',
