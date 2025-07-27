@@ -21,6 +21,7 @@ from playwright.async_api import async_playwright, Page
 from resume_fill import WorkdayFormScraper
 from direct_form_filler import DirectFormFiller
 from config_manager import ConfigurationManager, WorkdayPageAutomationConfig
+from performance_monitor import PerformanceMonitor, performance_monitor
 
 # Load environment variables
 load_dotenv()
@@ -1925,6 +1926,7 @@ class PageProcessor:
             
             # Common navigation button selectors (in order of preference)
             navigation_selectors = [
+                'button[data-automation-id="pageFooterNextButton"]',
                 'button:has-text("Next")',
                 'button:has-text("Continue")',
                 'button:has-text("Submit")',
@@ -2058,10 +2060,16 @@ class WorkdayPageAutomator:
         self.automation_state = AutomationState()
         self.logger = logging.getLogger(f"{__name__}.WorkdayPageAutomator")
         
+        # Initialize performance monitor
+        self.performance_monitor = PerformanceMonitor(
+            enable_monitoring=self.config.automation.enable_performance_monitoring,
+            log_interval=self.config.automation.performance_log_interval
+        )
+        
         # Apply configuration settings
         self._apply_configuration()
         
-        self.logger.info("WorkdayPageAutomator initialized with configuration management")
+        self.logger.info("WorkdayPageAutomator initialized with configuration management and performance monitoring")
     
     def _apply_configuration(self):
         """Apply configuration settings to components"""
@@ -2101,6 +2109,7 @@ class WorkdayPageAutomator:
         """Get automation mode configuration"""
         return self.config_manager.get_automation_mode_config()
     
+    @performance_monitor("run_automation")
     async def run_automation(self) -> bool:
         """
         Main automation orchestration method
@@ -2108,32 +2117,49 @@ class WorkdayPageAutomator:
         """
         try:
             self.logger.info("Starting Workday page automation")
+            
+            # Start performance monitoring
+            automation_id = f"workday_automation_{int(time.time())}"
+            self.performance_monitor.start_automation_monitoring(automation_id)
+            
             self.automation_state.automation_start_time = time.time()
             
             # Step 1: Create account using existing resume_fill.py functionality
             self.logger.info("Step 1: Account Creation")
-            account_success = await self.create_account()
+            async with self.performance_monitor.measure_async_operation("account_creation"):
+                account_success = await self.create_account()
             
             if not account_success:
                 self.logger.error("Account creation failed, cannot proceed with automation")
+                self.performance_monitor.stop_automation_monitoring()
                 return False
             
             # Step 2: Validate account status before proceeding to page processing
             self.logger.info("Step 2: Account Status Validation")
-            if not self.is_account_created():
-                self.logger.error("Account status validation failed")
-                return False
+            async with self.performance_monitor.measure_async_operation("account_validation"):
+                if not self.is_account_created():
+                    self.logger.error("Account status validation failed")
+                    self.performance_monitor.stop_automation_monitoring()
+                    return False
             
             self.logger.info("Account creation and validation successful")
             
-            # Step 3: Page processing will be implemented in later tasks
-            self.logger.info("Step 3: Page Processing (to be implemented in later tasks)")
-            page_processing_success = await self.process_all_pages()
+            # Step 3: Page processing with performance monitoring
+            self.logger.info("Step 3: Page Processing with Performance Monitoring")
+            async with self.performance_monitor.measure_async_operation("page_processing"):
+                page_processing_success = await self.process_all_pages()
             
             if not page_processing_success:
                 self.logger.error("Page processing failed")
+                self.performance_monitor.stop_automation_monitoring()
                 return False
             
+            # Generate and save performance report
+            self.logger.info("Generating performance report")
+            report = self.performance_monitor.generate_performance_report(automation_id)
+            self.performance_monitor.save_performance_report(report)
+            
+            self.performance_monitor.stop_automation_monitoring()
             self.logger.info("Workday automation completed successfully")
             return True
             
@@ -2289,38 +2315,57 @@ class WorkdayPageAutomator:
         return self.automation_state.account_created
     
     async def process_all_pages(self) -> bool:
-        """Process all pages in the automation flow using page-specific processors"""
+        """Process all pages in the automation flow with performance monitoring"""
         try:
-            self.logger.info("Starting page processing with page-specific processors")
+            self.logger.info("Starting page processing with performance monitoring")
             
-            # This method will be fully implemented in later tasks
-            # For now, it demonstrates the integration with page-specific processors
+            # Discover pages dynamically or use fallback
+            pages = await self._discover_pages_dynamically()
+            if not pages:
+                pages = ["Login", "My Information", "Job Application", "EEO", "Review"]  # Fallback
             
-            # Initialize browser context (placeholder - will be implemented in later tasks)
-            # async with async_playwright() as p:
-            #     browser = await p.chromium.launch(headless=self.config["headless"])
-            #     context = await browser.new_context()
-            #     page = await context.new_page()
-            #     
-            #     # Navigate through pages and process each one
-            #     page_processors = {
-            #         "login": self.process_login_page,
-            #         "my_information": self.process_my_information_page,
-            #         "job_application": self.process_job_application_page,
-            #         "eeo": self.process_eeo_page,
-            #         "review": self.process_review_page,
-            #         "unknown": self.process_unknown_page
-            #     }
-            #     
-            #     # Detect page type and call appropriate processor
-            #     page_type = await self.page_processor.detect_page_type(page)
-            #     processor = page_processors.get(page_type, self.process_unknown_page)
-            #     success = await processor(page)
-            #     
-            #     await browser.close()
-            #     return success
+            self.progress_tracker.initialize(pages)
             
-            self.logger.info("Page-specific processors are ready for integration")
+            for i, page_name in enumerate(pages):
+                self.logger.info(f"Processing page {i+1}/{len(pages)}: {page_name}")
+                
+                # Start page performance monitoring
+                self.performance_monitor.start_page_monitoring(page_name, i)
+                self.progress_tracker.update_progress(i, page_name)
+                
+                try:
+                    # Process single page with performance monitoring
+                    async with self.performance_monitor.measure_async_operation(f"page_{page_name.lower().replace(' ', '_')}"):
+                        page_success = await self._process_single_page(i, page_name)
+                    
+                    if page_success:
+                        self.progress_tracker.mark_page_completed()
+                        self.performance_monitor.end_page_monitoring(i, success=True)
+                        self.logger.info(f"Completed page: {page_name}")
+                    else:
+                        self.progress_tracker.mark_page_failed(i, f"Failed to process {page_name}")
+                        self.performance_monitor.end_page_monitoring(i, success=False)
+                        self.performance_monitor.increment_error_count()
+                        self.logger.error(f"Failed to process page: {page_name}")
+                        
+                        # Check if we should continue after failure
+                        if not await self._should_continue_after_failure(i, page_name):
+                            return False
+                
+                except Exception as e:
+                    self.logger.error(f"Error processing page {page_name}: {e}")
+                    self.performance_monitor.end_page_monitoring(i, success=False)
+                    self.performance_monitor.increment_error_count()
+                    self.progress_tracker.mark_page_failed(i, str(e))
+                    
+                    if not await self._should_continue_after_failure(i, page_name):
+                        return False
+            
+            # Log performance summary
+            performance_summary = self.performance_monitor.get_performance_summary()
+            self.logger.info(f"Page processing performance summary: {performance_summary}")
+            
+            self.logger.info("All pages processed successfully")
             return True
             
         except Exception as e:
@@ -3131,725 +3176,6 @@ class WorkdayPageAutomator:
         except Exception as e:
             self.logger.debug(f"Navigation wait error: {str(e)}")
 
-class WorkdayPageAutomator:
-    """
-    Main orchestrator for page-by-page Workday application automation
-    Requirements: 6.5, 7.5
-    """
-    
-    def __init__(self, config_manager: ConfigurationManager = None):
-        # Initialize configuration manager
-        self.config_manager = config_manager or ConfigurationManager()
-        self.config = self.config_manager.load_configuration()
-        
-        # Initialize components
-        self.progress_tracker = ProgressTracker()
-        self.page_processor = PageProcessor(DirectFormFiller())
-        self.json_extractor = JSONExtractor()
-        self.error_handler = ErrorHandler()
-        self.account_creator = WorkdayFormScraper()
-        self.automation_state = AutomationState()
-        self.logger = logging.getLogger(f"{__name__}.WorkdayPageAutomator")
-        
-        # Apply configuration settings
-        self._apply_configuration()
-        
-        # Browser context
-        self.browser = None
-        self.context = None
-        self.page = None
-    
-    def _apply_configuration(self):
-        """Apply configuration settings from config manager"""
-        # Configuration files
-        self.config_file = "workday_forms_complete.json"
-        self.state_file = "automation_state.json"
-        
-        # Apply automation configuration
-        automation_config = self.config.automation
-        self.max_retries = automation_config.max_retries
-        self.page_timeout = automation_config.page_timeout
-        self.navigation_delay = automation_config.navigation_delay
-        self.element_wait_timeout = automation_config.element_wait_timeout
-        self.form_fill_delay = automation_config.form_fill_delay
-        self.max_pages = 10  # Safety limit - could be configurable
-        
-        # Apply automation mode configuration
-        mode_config = self.config.automation_mode
-        self.headless = mode_config.headless
-        self.debug = mode_config.debug
-        self.slow_motion = mode_config.slow_motion
-        self.timeout = mode_config.timeout
-        self.screenshot_on_failure = mode_config.screenshot_on_failure
-        self.video_recording = mode_config.video_recording
-        self.trace_recording = mode_config.trace_recording
-        
-        # Apply workday configuration
-        workday_config = self.config.workday
-        self.tenant_url = workday_config.tenant_url
-        self.job_url = workday_config.job_url
-        self.create_account_mode = workday_config.create_account_mode
-        self.resume_path = workday_config.resume_path
-        
-        self.logger.info(f"Configuration applied - Headless: {self.headless}, Debug: {self.debug}, Page timeout: {self.page_timeout}ms")
-    
-    async def run_automation(self) -> bool:
-        """
-        Main automation orchestration method
-        Requirement: 6.5 - WHEN the entire process completes THEN the system SHALL provide a success confirmation
-        Requirement: 7.5 - WHEN the process completes THEN the system SHALL generate a summary report
-        """
-        try:
-            self.logger.info("Starting Workday page automation")
-            self.automation_state.automation_start_time = time.time()
-            
-            # Initialize browser context
-            if not await self._initialize_browser():
-                return False
-            
-            # Load or create automation state
-            await self._load_automation_state()
-            
-            # Step 1: Account creation
-            if not self.automation_state.account_created:
-                self.logger.info("Step 1: Creating account")
-                account_success = await self._create_account()
-                if not account_success:
-                    await self._generate_failure_report("Account creation failed")
-                    return False
-                
-                self.automation_state.account_created = True
-                await self._save_automation_state()
-            else:
-                self.logger.info("Account already created, skipping account creation")
-            
-            # Step 2: Page discovery and initialization
-            self.logger.info("Step 2: Discovering pages and initializing progress tracker")
-            pages_discovered = await self._discover_pages()
-            if not pages_discovered:
-                await self._generate_failure_report("Page discovery failed")
-                return False
-            
-            # Step 3: Sequential page processing
-            self.logger.info("Step 3: Processing pages sequentially")
-            processing_success = await self._process_all_pages()
-            if not processing_success:
-                await self._generate_failure_report("Page processing failed")
-                return False
-            
-            # Step 4: Final success confirmation and reporting
-            self.logger.info("Step 4: Generating success report")
-            await self._generate_success_report()
-            
-            self.logger.info("Workday automation completed successfully")
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Critical error in automation: {str(e)}")
-            await self._generate_failure_report(f"Critical error: {str(e)}")
-            return False
-        
-        finally:
-            # Cleanup resources
-            await self._cleanup_browser()
-    
-    async def _initialize_browser(self) -> bool:
-        """Initialize browser context for automation"""
-        try:
-            from playwright.async_api import async_playwright
-            
-            self.playwright = await async_playwright().start()
-            self.browser = await self.playwright.chromium.launch(
-                headless=os.getenv('AUTOMATION_HEADLESS', 'false').lower() == 'true'
-            )
-            self.context = await self.browser.new_context()
-            self.page = await self.context.new_page()
-            
-            # Set page timeout
-            self.page.set_default_timeout(self.page_timeout)
-            
-            self.logger.info("Browser initialized successfully")
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Failed to initialize browser: {str(e)}")
-            return False
-    
-    async def _create_account(self) -> bool:
-        """
-        Coordinate account creation using existing functionality
-        Requirement: 6.5 - Coordinate account creation, page discovery, and sequential processing
-        """
-        try:
-            self.error_handler.set_page_context("Account Creation", "N/A", 0)
-            
-            # Use existing account creation functionality
-            self.logger.info("Initiating account creation using WorkdayFormScraper")
-            
-            # Create account using existing resume_fill.py functionality
-            account_result = await self._execute_account_creation()
-            
-            if account_result:
-                self.logger.info("Account creation completed successfully")
-                return True
-            else:
-                self.logger.error("Account creation failed")
-                return False
-                
-        except Exception as e:
-            self.logger.error(f"Error in account creation: {str(e)}")
-            return await self.error_handler.handle_account_creation_error(e)
-    
-    async def _execute_account_creation(self) -> bool:
-        """Execute account creation with error handling"""
-        try:
-            # This would integrate with the existing WorkdayFormScraper
-            # For now, we'll simulate the account creation process
-            self.logger.info("Executing account creation process")
-            
-            # Navigate to the job application URL
-            tenant_url = os.getenv('WORKDAY_TENANT_URL')
-            if not tenant_url:
-                raise Exception("WORKDAY_TENANT_URL environment variable not set")
-            
-            await self.page.goto(tenant_url)
-            await self.page.wait_for_load_state('networkidle')
-            
-            # Check if we're already logged in or need to create account
-            current_url = self.page.url
-            if "apply" in current_url.lower():
-                self.logger.info("Already on application page, account creation may not be needed")
-                return True
-            
-            # Look for account creation elements
-            create_account_elements = [
-                'button:has-text("Create Account")',
-                'a:has-text("Create Account")',
-                'button:has-text("Sign Up")',
-                'a:has-text("Sign Up")',
-                '#createAccountSubmitButton'
-            ]
-            
-            for selector in create_account_elements:
-                try:
-                    element = await self.page.query_selector(selector)
-                    if element and await element.is_visible():
-                        await element.click()
-                        await self.page.wait_for_load_state('networkidle')
-                        break
-                except:
-                    continue
-            
-            # Fill account creation form if present
-            await self._fill_account_creation_form()
-            
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Account creation execution failed: {str(e)}")
-            raise e
-    
-    async def _fill_account_creation_form(self):
-        """Fill account creation form with environment variables"""
-        try:
-            # Email field
-            email_selectors = ['#email', '[name="email"]', '#signInFormo']
-            email_value = os.getenv('REGISTRATION_EMAIL')
-            
-            if email_value:
-                for selector in email_selectors:
-                    try:
-                        element = await self.page.query_selector(selector)
-                        if element and await element.is_visible():
-                            await element.fill(email_value)
-                            break
-                    except:
-                        continue
-            
-            # Password fields
-            password_selectors = ['#password', '[name="password"]']
-            password_value = os.getenv('REGISTRATION_PASSWORD', 'TempPassword123!')
-            
-            for selector in password_selectors:
-                try:
-                    element = await self.page.query_selector(selector)
-                    if element and await element.is_visible():
-                        await element.fill(password_value)
-                        break
-                except:
-                    continue
-            
-            # Verify password field
-            verify_password_selectors = ['#verifyPassword', '[name="verifyPassword"]']
-            for selector in verify_password_selectors:
-                try:
-                    element = await self.page.query_selector(selector)
-                    if element and await element.is_visible():
-                        await element.fill(password_value)
-                        break
-                except:
-                    continue
-            
-            # Submit button
-            submit_selectors = [
-                '#createAccountSubmitButton',
-                'button:has-text("Create Account")',
-                'button[type="submit"]',
-                'input[type="submit"]'
-            ]
-            
-            for selector in submit_selectors:
-                try:
-                    element = await self.page.query_selector(selector)
-                    if element and await element.is_visible():
-                        await element.click()
-                        await self.page.wait_for_load_state('networkidle')
-                        break
-                except:
-                    continue
-            
-        except Exception as e:
-            self.logger.warning(f"Error filling account creation form: {str(e)}")
-    
-    async def _discover_pages(self) -> bool:
-        """
-        Discover available pages and initialize progress tracking
-        Requirement: 6.5 - Coordinate account creation, page discovery, and sequential processing
-        """
-        try:
-            self.logger.info("Discovering application pages")
-            
-            # Load existing JSON configuration if available
-            page_config = self._load_page_configuration()
-            
-            if page_config and 'pages_visited' in page_config:
-                # Use existing page configuration
-                pages = [page.get('title', f"Page {i+1}") for i, page in enumerate(page_config['pages_visited'])]
-                self.automation_state.total_pages = len(pages)
-                
-                self.logger.info(f"Loaded {len(pages)} pages from configuration")
-            else:
-                # Discover pages dynamically
-                pages = await self._discover_pages_dynamically()
-                self.automation_state.total_pages = len(pages)
-            
-            if not pages:
-                self.logger.error("No pages discovered")
-                return False
-            
-            # Initialize progress tracker
-            self.progress_tracker.initialize(pages)
-            
-            self.logger.info(f"Discovered {len(pages)} pages: {', '.join(pages)}")
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Error discovering pages: {str(e)}")
-            return False
-    
-    async def _discover_pages_dynamically(self) -> List[str]:
-        """Dynamically discover pages by analyzing the current application flow"""
-        try:
-            pages = []
-            
-            # Common Workday application page patterns
-            expected_pages = [
-                "Login/Account Creation",
-                "My Information", 
-                "Work Experience",
-                "Education",
-                "Skills & Qualifications",
-                "EEO Information",
-                "Review & Submit"
-            ]
-            
-            # For now, return expected pages
-            # In a full implementation, this would analyze the actual page structure
-            return expected_pages
-            
-        except Exception as e:
-            self.logger.error(f"Error in dynamic page discovery: {str(e)}")
-            return ["Page 1", "Page 2", "Page 3"]  # Fallback
-    
-    async def _process_all_pages(self) -> bool:
-        """
-        Process all discovered pages sequentially
-        Requirement: 6.5 - Coordinate account creation, page discovery, and sequential processing
-        """
-        try:
-            self.logger.info("Starting sequential page processing")
-            
-            total_pages = self.automation_state.total_pages
-            if total_pages == 0:
-                self.logger.error("No pages to process")
-                return False
-            
-            # Process each page sequentially
-            for page_index in range(total_pages):
-                if page_index >= self.max_pages:
-                    self.logger.warning(f"Reached maximum page limit ({self.max_pages})")
-                    break
-                
-                # Update progress tracker
-                page_name = self.progress_tracker.page_names[page_index] if page_index < len(self.progress_tracker.page_names) else f"Page {page_index + 1}"
-                self.progress_tracker.update_progress(page_index, page_name)
-                
-                # Set error handler context
-                self.error_handler.set_page_context(page_name, self.page.url if self.page else "N/A", page_index)
-                
-                self.logger.info(f"Processing page {page_index + 1}/{total_pages}: {page_name}")
-                
-                # Process the current page
-                page_success = await self._process_single_page(page_index, page_name)
-                
-                if page_success:
-                    # Mark page as completed
-                    self.progress_tracker.mark_page_completed(page_index)
-                    self.automation_state.pages_completed.append(page_name)
-                    
-                    self.logger.info(f"Page {page_index + 1} completed successfully: {page_name}")
-                    
-                    # Save state after each successful page
-                    await self._save_automation_state()
-                    
-                else:
-                    # Mark page as failed
-                    self.progress_tracker.mark_page_failed(page_index, "Processing failed")
-                    self.automation_state.pages_failed.append(page_name)
-                    
-                    self.logger.error(f"Page {page_index + 1} failed: {page_name}")
-                    
-                    # Decide whether to continue or stop
-                    if await self._should_continue_after_failure(page_index, page_name):
-                        self.logger.info("Continuing to next page despite failure")
-                        continue
-                    else:
-                        self.logger.error("Stopping automation due to critical page failure")
-                        return False
-                
-                # Small delay between pages
-                await asyncio.sleep(1)
-            
-            # Check if all pages were processed successfully
-            success_rate = len(self.automation_state.pages_completed) / total_pages
-            self.logger.info(f"Page processing completed. Success rate: {success_rate:.1%}")
-            
-            return success_rate >= 0.8  # Consider successful if 80% of pages completed
-            
-        except Exception as e:
-            self.logger.error(f"Error in sequential page processing: {str(e)}")
-            return False
-    
-    async def _process_single_page(self, page_index: int, page_name: str) -> bool:
-        """Process a single page with comprehensive error handling"""
-        try:
-            if not self.page:
-                self.logger.error("Browser page not available")
-                return False
-            
-            # Wait for page to be ready
-            await self.page.wait_for_load_state('networkidle')
-            
-            # Use the PageProcessor to handle the page
-            page_config = self._get_page_config(page_index)
-            processing_result = await self.page_processor.process_page(self.page, page_config)
-            
-            return processing_result
-            
-        except Exception as e:
-            self.logger.error(f"Error processing single page {page_name}: {str(e)}")
-            
-            # Try error recovery
-            recovery_success = await self.error_handler.handle_page_navigation_error(e)
-            if recovery_success:
-                self.logger.info(f"Recovered from error on page {page_name}")
-                return True
-            
-            return False
-    
-    def _get_page_config(self, page_index: int) -> Dict:
-        """Get configuration for a specific page"""
-        try:
-            config = self._load_page_configuration()
-            if config and 'pages_visited' in config and page_index < len(config['pages_visited']):
-                return config['pages_visited'][page_index]
-            return {}
-        except:
-            return {}
-    
-    def _load_page_configuration(self) -> Dict:
-        """Load page configuration from JSON file"""
-        try:
-            if os.path.exists(self.config_file):
-                return self.json_extractor.load_json_config(self.config_file)
-            return {}
-        except Exception as e:
-            self.logger.warning(f"Could not load page configuration: {str(e)}")
-            return {}
-    
-    async def _should_continue_after_failure(self, page_index: int, page_name: str) -> bool:
-        """Determine if automation should continue after a page failure"""
-        # Critical pages that should stop automation if they fail
-        critical_pages = ["login", "account", "review", "submit"]
-        
-        if any(critical in page_name.lower() for critical in critical_pages):
-            return False
-        
-        # If too many pages have failed, stop
-        failure_rate = len(self.automation_state.pages_failed) / (page_index + 1)
-        if failure_rate > 0.5:  # More than 50% failure rate
-            return False
-        
-        return True
-    
-    async def _load_automation_state(self):
-        """
-        Load automation state for recovery capabilities
-        Requirement: 6.5 - Add automation state persistence and recovery capabilities
-        """
-        try:
-            if os.path.exists(self.state_file):
-                with open(self.state_file, 'r') as f:
-                    state_data = json.load(f)
-                
-                # Restore state
-                self.automation_state.current_page_index = state_data.get('current_page_index', 0)
-                self.automation_state.total_pages = state_data.get('total_pages', 0)
-                self.automation_state.pages_completed = state_data.get('pages_completed', [])
-                self.automation_state.pages_failed = state_data.get('pages_failed', [])
-                self.automation_state.account_created = state_data.get('account_created', False)
-                
-                self.logger.info(f"Loaded automation state: {len(self.automation_state.pages_completed)} pages completed")
-            else:
-                self.logger.info("No existing automation state found, starting fresh")
-                
-        except Exception as e:
-            self.logger.warning(f"Could not load automation state: {str(e)}")
-    
-    async def _save_automation_state(self):
-        """
-        Save current automation state for recovery
-        Requirement: 6.5 - Add automation state persistence and recovery capabilities
-        """
-        try:
-            state_data = {
-                'current_page_index': self.automation_state.current_page_index,
-                'total_pages': self.automation_state.total_pages,
-                'pages_completed': self.automation_state.pages_completed,
-                'pages_failed': self.automation_state.pages_failed,
-                'account_created': self.automation_state.account_created,
-                'last_updated': time.time()
-            }
-            
-            with open(self.state_file, 'w') as f:
-                json.dump(state_data, f, indent=2)
-            
-            self.logger.debug("Automation state saved")
-            
-        except Exception as e:
-            self.logger.warning(f"Could not save automation state: {str(e)}")
-    
-    async def _generate_success_report(self):
-        """
-        Generate final success report and summary
-        Requirement: 7.5 - WHEN the process completes THEN the system SHALL generate a summary report
-        """
-        try:
-            end_time = time.time()
-            total_duration = end_time - self.automation_state.automation_start_time
-            
-            # Collect progress information
-            progress_info = self.progress_tracker.get_progress_info()
-            error_summary = self.error_handler.get_error_summary()
-            
-            # Create comprehensive success report
-            success_report = {
-                'automation_result': 'SUCCESS',
-                'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
-                'duration': {
-                    'total_seconds': total_duration,
-                    'formatted': self._format_duration(total_duration)
-                },
-                'pages': {
-                    'total_pages': self.automation_state.total_pages,
-                    'completed_pages': len(self.automation_state.pages_completed),
-                    'failed_pages': len(self.automation_state.pages_failed),
-                    'success_rate': f"{(len(self.automation_state.pages_completed) / max(self.automation_state.total_pages, 1)) * 100:.1f}%"
-                },
-                'completed_pages_list': self.automation_state.pages_completed,
-                'failed_pages_list': self.automation_state.pages_failed,
-                'account_creation': {
-                    'status': 'SUCCESS' if self.automation_state.account_created else 'SKIPPED'
-                },
-                'error_summary': error_summary,
-                'progress_final': {
-                    'percentage': progress_info.percentage_complete,
-                    'status': progress_info.status
-                }
-            }
-            
-            # Save report to file
-            report_file = f"automation_success_report_{int(time.time())}.json"
-            with open(report_file, 'w') as f:
-                json.dump(success_report, f, indent=2)
-            
-            # Display success summary
-            self._display_success_summary(success_report)
-            
-            self.logger.info(f"Success report generated: {report_file}")
-            
-        except Exception as e:
-            self.logger.error(f"Error generating success report: {str(e)}")
-    
-    async def _generate_failure_report(self, failure_reason: str):
-        """
-        Generate failure report and summary
-        Requirement: 7.5 - WHEN the process completes THEN the system SHALL generate a summary report
-        """
-        try:
-            end_time = time.time()
-            total_duration = end_time - self.automation_state.automation_start_time
-            
-            # Collect error information
-            error_summary = self.error_handler.get_error_summary()
-            progress_info = self.progress_tracker.get_progress_info()
-            
-            # Create comprehensive failure report
-            failure_report = {
-                'automation_result': 'FAILURE',
-                'failure_reason': failure_reason,
-                'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
-                'duration': {
-                    'total_seconds': total_duration,
-                    'formatted': self._format_duration(total_duration)
-                },
-                'pages': {
-                    'total_pages': self.automation_state.total_pages,
-                    'completed_pages': len(self.automation_state.pages_completed),
-                    'failed_pages': len(self.automation_state.pages_failed),
-                    'completion_rate': f"{(len(self.automation_state.pages_completed) / max(self.automation_state.total_pages, 1)) * 100:.1f}%"
-                },
-                'completed_pages_list': self.automation_state.pages_completed,
-                'failed_pages_list': self.automation_state.pages_failed,
-                'account_creation': {
-                    'status': 'SUCCESS' if self.automation_state.account_created else 'FAILED'
-                },
-                'error_summary': error_summary,
-                'progress_at_failure': {
-                    'percentage': progress_info.percentage_complete,
-                    'current_page': progress_info.current_page,
-                    'status': progress_info.status
-                },
-                'last_error': self.automation_state.last_error
-            }
-            
-            # Save report to file
-            report_file = f"automation_failure_report_{int(time.time())}.json"
-            with open(report_file, 'w') as f:
-                json.dump(failure_report, f, indent=2)
-            
-            # Display failure summary
-            self._display_failure_summary(failure_report)
-            
-            self.logger.error(f"Failure report generated: {report_file}")
-            
-        except Exception as e:
-            self.logger.error(f"Error generating failure report: {str(e)}")
-    
-    def _display_success_summary(self, report: Dict):
-        """Display formatted success summary"""
-        print(f"\n{'='*60}")
-        print("🎉 WORKDAY AUTOMATION COMPLETED SUCCESSFULLY! 🎉")
-        print(f"{'='*60}")
-        print(f"Duration: {report['duration']['formatted']}")
-        print(f"Pages Completed: {report['pages']['completed_pages']}/{report['pages']['total_pages']} ({report['pages']['success_rate']})")
-        print(f"Account Creation: {report['account_creation']['status']}")
-        
-        if report['completed_pages_list']:
-            print(f"\nCompleted Pages:")
-            for i, page in enumerate(report['completed_pages_list'], 1):
-                print(f"  {i}. {page}")
-        
-        if report['failed_pages_list']:
-            print(f"\nFailed Pages:")
-            for i, page in enumerate(report['failed_pages_list'], 1):
-                print(f"  {i}. {page}")
-        
-        print(f"{'='*60}\n")
-    
-    def _display_failure_summary(self, report: Dict):
-        """Display formatted failure summary"""
-        print(f"\n{'='*60}")
-        print("❌ WORKDAY AUTOMATION FAILED")
-        print(f"{'='*60}")
-        print(f"Failure Reason: {report['failure_reason']}")
-        print(f"Duration: {report['duration']['formatted']}")
-        print(f"Progress: {report['progress_at_failure']['percentage']:.1f}% ({report['pages']['completed_pages']}/{report['pages']['total_pages']} pages)")
-        print(f"Current Page: {report['progress_at_failure']['current_page']}")
-        
-        if report['completed_pages_list']:
-            print(f"\nCompleted Pages:")
-            for i, page in enumerate(report['completed_pages_list'], 1):
-                print(f"  ✅ {page}")
-        
-        if report['failed_pages_list']:
-            print(f"\nFailed Pages:")
-            for i, page in enumerate(report['failed_pages_list'], 1):
-                print(f"  ❌ {page}")
-        
-        print(f"{'='*60}\n")
-    
-    def _format_duration(self, seconds: float) -> str:
-        """Format duration in human-readable format"""
-        if seconds < 60:
-            return f"{seconds:.1f}s"
-        elif seconds < 3600:
-            minutes = int(seconds // 60)
-            secs = int(seconds % 60)
-            return f"{minutes}m {secs}s"
-        else:
-            hours = int(seconds // 3600)
-            minutes = int((seconds % 3600) // 60)
-            return f"{hours}h {minutes}m"
-    
-    def get_page_processor_config(self, page_name: str):
-        """Get configuration for a specific page processor"""
-        return self.config_manager.get_page_processor_config(page_name)
-    
-    def get_form_elements_config(self):
-        """Get form elements configuration"""
-        return self.config_manager.get_form_elements_config()
-    
-    def get_automation_mode_config(self):
-        """Get automation mode configuration"""
-        return self.config_manager.get_automation_mode_config()
-    
-    def get_workday_config(self):
-        """Get Workday-specific configuration"""
-        return self.config_manager.get_workday_config()
-    
-    def get_automation_config(self):
-        """Get general automation configuration"""
-        return self.config_manager.get_automation_config()
-
-    async def _cleanup_browser(self):
-        """Clean up browser resources"""
-        try:
-            if self.page:
-                await self.page.close()
-            if self.context:
-                await self.context.close()
-            if self.browser:
-                await self.browser.close()
-            if hasattr(self, 'playwright'):
-                await self.playwright.stop()
-            
-            self.logger.info("Browser resources cleaned up")
-            
-        except Exception as e:
-            self.logger.warning(f"Error cleaning up browser: {str(e)}")
-
-# Main execution
 async def main():
     """Main entry point for the automation"""
     automator = WorkdayPageAutomator()
