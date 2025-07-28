@@ -53,7 +53,7 @@ JOB_URL=https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/
 <<<<<<< HEAD
 RESUME_PATH=C:/Users/YourName/Downloads/your_resume.pdf
 =======
-RESUME_PATH=C:/Users/Lakshin Khurana/Downloads/Lin Mei_Experiened Level Software.pdf
+RESUME_PATH=Lin Mei_Experiened Level Software.pdf
 >>>>>>> 4cbfa38f73e545223e2a3c564ee64bb194965d8e
 WORKDAY_END_URL=https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/jobTasks/completed/application
 
