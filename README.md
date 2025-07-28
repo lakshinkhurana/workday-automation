@@ -1,8 +1,8 @@
-# Workday Job Application Automation
+# Workday Automation
 
 An automated form filling system for Workday job applications that streamlines the application process by automatically filling out forms with your personal information.
 
-## 🚀 Features
+## Features
 
 - **Automated Form Filling**: Automatically fills out Workday job application forms
 - **Multi-Page Support**: Handles multiple application pages (My Information, Experience, Voluntary Disclosures, etc.)
@@ -13,103 +13,122 @@ An automated form filling system for Workday job applications that streamlines t
 - **Comprehensive Logging**: Detailed logging for debugging and monitoring
 - **Form Extraction**: Extracts form structure and saves to JSON for analysis
 
-## 📋 Prerequisites
+## Prerequisites
 
 - Python 3.7+
 - Playwright browser automation library
 - Chrome/Chromium browser
 
-## 🛠️ Installation
+## Installation
 
-1. Clone the repository:
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/lakshinkhurana/workday-automation.git
+   cd workday-automation
+   ```
 
-```bash
-git clone <repository-url>
-cd workday-automation
-```
+2. **Install required dependencies:**
+   ```bash
+   pip install playwright python-dotenv
+   ```
 
-2. Install required dependencies:
+3. **Install Playwright browsers:**
+   ```bash
+   playwright install chromium
+   ```
 
-```bash
-pip install playwright python-dotenv
-```
+## Configuration
 
-3. Install Playwright browsers:
-
-```bash
-playwright install chromium
-```
-
-## ⚙️ Configuration
-
-1. Create a `.env` file in the project root with your personal information:
+Create a `.env` file in the project root with your personal information:
 
 ```env
-# Personal Information
-REGISTRATION_FIRST_NAME=John
-REGISTRATION_LAST_NAME=Doe
-REGISTRATION_EMAIL=john.doe@email.com
-REGISTRATION_PHONE=1234567890
+# Workday Configuration
+WORKDAY_TENANT_URL=https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite
+WORKDAY_USERNAME=dummy128mailneeded@gmail.com
+WORKDAY_PASSWORD=SecurePassword@123
+JOB_URL=https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-CA%2C-Santa-Clara/Senior-Systems-Engineer--DriveAV---Autonomous-Vehicles_JR2000493/apply/applyManually?locationHierarchy1=2fcb99c455831013ea52fb338f2932d8
+RESUME_PATH=C:/Users/YourName/Downloads/your_resume.pdf
+WORKDAY_END_URL=https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/jobTasks/completed/application
 
-# Professional Information
-CURRENT_COMPANY=Tech Corp
-CURRENT_ROLE=Software Engineer
-YEARS_EXPERIENCE=5
-PRIMARY_SKILLS=Python, JavaScript, React
+# Registration Configuration
+CREATE_ACCOUNT_MODE=true
+REGISTRATION_FIRST_NAME=Your_First_Name
+REGISTRATION_LAST_NAME=Your_Last_Name
+JOB_BOARD=Indeed
+REGISTRATION_EMAIL=your_email@gmail.com
+REGISTRATION_PASSWORD=SecurePassword@123
+REGISTRATION_PHONE=123-456-7890
+
+# Personal Information
+FULL_NAME=Your Full Name
+LOCATION=Your City, State
+COUNTRY=United States Of America
+GITHUB_URL=https://github.com/yourusername
+CURRENT_POSITION=Your Current Position
+YEARS_EXPERIENCE=5+
 
 # Education
-EDUCATION_MASTERS=Computer Science
+EDUCATION_MASTERS=Master of Science in Computer Science - University Name, City, State
+EDUCATION_BACHELORS=Bachelor of Engineering in Computer Science - University Name, City, State
 
-# Location (optional)
-LOCATION=California, USA
-COUNTRY=United States
-STATE=California
+# Current Employment
+CURRENT_COMPANY=Your Current Company
+CURRENT_ROLE=Your Current Role
+EMPLOYMENT_PERIOD=Jan 2020 - Present
 
-# Job Application Settings
-WORKDAY_TENANT_URL=https://company.wd5.myworkdayjobs.com/en-US/careers
-JOB_BOARD=vidyapeeth
+# Previous Employment
+PREVIOUS_COMPANY=Your Previous Company
+PREVIOUS_ROLE=Your Previous Role
+PREVIOUS_PERIOD=Jan 2018 - Dec 2019
 
-# Voluntary Disclosures (optional)
-ETHNICITY=Prefer not to disclose
-GENDER=Prefer not to disclose
-VETERAN_STATUS=I am not a protected veteran
-DISABILITY_STATUS=I don't wish to answer
+# Skills Summary
+PRIMARY_SKILLS=Python, JavaScript, Java, SQL, HTML5, CSS3
+FRAMEWORKS=Django, React, Node.js, Express
+CLOUD_PLATFORMS=AWS, Azure, Google Cloud
+DATABASES=PostgreSQL, MySQL, MongoDB
+TESTING_FRAMEWORKS=Jest, Pytest, Selenium
+
+# Personal Preferences
+DISABILITY_STATUS=I do not wish to answer
 ```
 
-2. Update the `WORKDAY_TENANT_URL` with the specific company's Workday careers page URL.
+**Important**: Update the `WORKDAY_TENANT_URL` with the specific company's Workday careers page URL.
 
-## 🚀 Usage
+## Usage
 
 ### Basic Usage
 
 Run the main automation script:
-
 ```bash
-python flow.py
+python main.py
 ```
 
 ### Direct Form Filling
 
 For direct form filling on an already opened page:
-
 ```bash
 python direct_form_filler.py
 ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 workday-automation/
-├── flow.py                     # Main automation flow
-├── direct_form_filler.py       # Direct form filling logic
-├── manual_login.py            # Manual login utilities
+├── .gitignore
+├── main.py                    # Main automation flow
+├── direct_form_filler.py      # Direct form filling logic
+├── config_manager.py          # Configuration management
+├── resume_fill.py             # Resume handling logic
+├── performance_monitor.py     # Performance monitoring
 ├── .env                       # Environment variables (create this)
 ├── workday_forms_complete.json # Extracted form data
 ├── README.md                  # This file
 └── LICENSE                    # License file
 ```
 
-## 🔧 How It Works
+## How It Works
+
+The automation system follows this workflow:
 
 1. **Navigation**: Automatically navigates to the job posting page
 2. **Job Selection**: Finds and clicks on job title links
@@ -123,7 +142,9 @@ workday-automation/
    - Self Identify (disability status)
 6. **Form Submission**: Submits completed forms
 
-## 🎯 Supported Field Types
+## Supported Field Types
+
+The system can handle various form field types:
 
 - **Text Fields**: Name, email, phone, address, etc.
 - **Date Fields**: Individual month/day/year spinbutton inputs
@@ -132,7 +153,7 @@ workday-automation/
 - **Checkboxes**: Terms acceptance, preferences
 - **Textarea Fields**: Long text responses
 
-## 🔍 Field Detection Strategy
+## Field Detection Strategy
 
 The system uses multiple strategies to find form fields:
 
@@ -141,7 +162,7 @@ The system uses multiple strategies to find form fields:
 3. **Name Attribute**: `input[name="fieldName"]`
 4. **Partial Matching**: `input[id*="fieldName"]`
 
-## 📊 Form Data Extraction
+## Form Structure Extraction
 
 The system extracts form structure and saves it to `workday_forms_complete.json` including:
 
@@ -151,7 +172,7 @@ The system extracts form structure and saves it to `workday_forms_complete.json`
 - Available options for dropdowns
 - Page metadata
 
-## 🐛 Debugging
+## Logging and Debugging
 
 Enable detailed logging by checking the console output. The system provides:
 
@@ -160,20 +181,20 @@ Enable detailed logging by checking the console output. The system provides:
 - Selector strategies used
 - Error messages and troubleshooting info
 
-## ⚠️ Important Notes
+## Important Considerations
 
 - **Rate Limiting**: The system includes delays to avoid overwhelming servers
 - **Browser Visibility**: Runs in non-headless mode for monitoring
 - **Manual Intervention**: Some complex fields may require manual completion
 - **Company-Specific**: May need adjustments for different Workday implementations
 
-## 🔒 Privacy & Security
+## Privacy and Security
 
 - All personal information is stored locally in the `.env` file
 - No data is transmitted to external servers except the target Workday site
 - Use responsibly and in accordance with company application policies
 
-## 🤝 Contributing
+## Legal and Ethical Use
 
 This project is for educational and personal use only. Please ensure compliance with:
 
@@ -181,11 +202,11 @@ This project is for educational and personal use only. Please ensure compliance 
 - Company application policies
 - Applicable laws and regulations
 
-## 📝 License
+## License
 
 This project is licensed under a Non-Commercial License - see the [LICENSE](LICENSE) file for details.
 
-## ⚠️ Disclaimer
+## Disclaimer
 
 This tool is provided for educational purposes only. Users are responsible for:
 
@@ -196,22 +217,20 @@ This tool is provided for educational purposes only. Users are responsible for:
 
 The authors are not responsible for any misuse of this tool or consequences arising from its use.
 
-## 🆘 Troubleshooting
+## Troubleshooting
 
-### Common Issues
+Common issues and solutions:
 
-1. **Fields Not Found**: Check if field IDs have changed on the website
-2. **Slow Performance**: Increase delays in the code if needed
-3. **Login Issues**: Ensure correct credentials in `.env` file
-4. **Browser Crashes**: Update Playwright and browser versions
+- **Fields Not Found**: Check if field IDs have changed on the website
+- **Slow Performance**: Increase delays in the code if needed
+- **Login Issues**: Ensure correct credentials in `.env` file
+- **Browser Crashes**: Update Playwright and browser versions
 
-### Getting Help
+### Debug Steps
 
 1. Check the console output for detailed error messages
 2. Verify your `.env` configuration
 3. Ensure the Workday URL is correct and accessible
 4. Test with a simple job application first
-
----
 
 **Remember**: Always use this tool responsibly and in compliance with applicable terms of service and policies.
