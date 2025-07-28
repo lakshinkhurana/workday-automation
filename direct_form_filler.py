@@ -925,7 +925,7 @@ class DirectFormFiller:
             for field_id, value in self_identity_dates.items():
                 if value:
                     success = await self._handle_date_simple_fill(page, field_id, value) 
-            await self._handle_disability_checkboxes(page)
+            await self._handle_disability_checkboxes(page, preferred_option=os.getenv('DISABILITY_STATUS', 'no answer'))
             save_success = await self._press_save_and_continue(page)
             
             if save_success:
@@ -939,65 +939,124 @@ class DirectFormFiller:
             print(f"  ❌ Error handling Self Identity page: {str(e)}")
             return False
     
-    async def _handle_disability_checkboxes(self, page) -> bool:
-      """Handle disability status checkboxes on Self Identity page"""
+    async def _handle_disability_checkboxes(self, page, preferred_option: str = 'no answer') -> bool:
+      """Handle disability status checkboxes on Self Identity page
+      Args:
+          page: The page object
+          preferred_option: The user's preferred disability status option. If None, will use default options.
+      """
       print("    🔲 Handling disability status checkboxes...")
     
       try:
-          # Define all possible disability options in order of preference
-          disability_options = [
-              "I do not wish to answer",
-              "I do not want to answer",
-              "I prefer not to answer",
-              "Choose not to identify",
-              "Decline to answer",
-              "Prefer not to disclose",
-              "Do not wish to identify"
-          ]
+          # Define all possible disability options with common variations
+          disability_options = {
+              "no answer": [
+                  "I do not wish to answer",
+                  "I do not want to answer",
+                  "I prefer not to answer",
+                  "Choose not to identify",
+                  "Decline to answer",
+                  "Prefer not to disclose",
+                  "Do not wish to identify"
+              ],
+              "yes": [
+                  "Yes, I have a disability, or have had one in the past",
+                  "Yes",
+                  "I have a disability",
+                  "Person with disability"
+              ],
+              "no": [
+                  "No, I don't have a disability and have not had one in the past",
+                  "No",
+                  "I do not have a disability",
+                  "No disability"
+              ]
+          }
+
+          # Determine which options to try based on preferred_option
+          options_to_try = []
+          if preferred_option:
+              preferred_option = preferred_option.lower()
+              # Try to match the preferred option with our defined categories
+              for category, category_options in disability_options.items():
+                  if preferred_option in category.lower():
+                      print(f"      🎯 Using preferred option category: {category}")
+                      options_to_try = category_options
+                      break
+              
+              # If no category match, try the exact preferred option first
+              if not options_to_try:
+                  options_to_try = [preferred_option] + disability_options["no answer"]
+                  print(f"      🎯 Using custom preferred option: {preferred_option}")
+          else:
+              # If no preference specified, use the "no answer" options
+              options_to_try = disability_options["no answer"]
+              print("      ℹ️ No preference specified, using default 'no answer' options")
 
           # Try finding labels with specific text content
-          for option in disability_options:
-            try:
-                # Use text content selectors
-                label_selectors = [
-                    f'label:has-text("{option}")',
-                    f'[role="radio"]:has-text("{option}")',
-                    f'div[role="radio"]:has-text("{option}")',
-                    f'div:has-text("{option}") >> role=radio',
-                    f'text="{option}"'
-                ]
+          for option in options_to_try:
+              try:
+                  # Use text content selectors
+                  label_selectors = [
+                      f'label:has-text("{option}")',
+                      f'[role="radio"]:has-text("{option}")',
+                      f'div[role="radio"]:has-text("{option}")',
+                      f'div:has-text("{option}") >> role=radio',
+                      f'text="{option}"'
+                  ]
 
-                for selector in label_selectors:
-                    print(f"      🔍 Looking for: '{selector}'")
-                    element = await page.query_selector(selector)
-                    
-                    if element and await element.is_visible():
-                        # Try clicking the element
-                        await element.click()
-                        await asyncio.sleep(0.5)
-                        print(f"      ✅ Clicked option: '{option}'")
-                        return True
+                  for selector in label_selectors:
+                      print(f"      🔍 Looking for: '{selector}'")
+                      element = await page.query_selector(selector)
+                      
+                      if element and await element.is_visible():
+                          # Try clicking the element
+                          await element.click()
+                          await asyncio.sleep(0.5)
+                          print(f"      ✅ Clicked option: '{option}'")
+                          return True
 
-            except Exception as e:
-                print(f"      ⚠️ Error processing option '{option}': {str(e)}")
-                continue
+              except Exception as e:
+                  print(f"      ⚠️ Error processing option '{option}': {str(e)}")
+                  continue
 
           # Fallback: Try finding any visible radio buttons or labels with similar text
-          print("    🔄 Trying fallback approach...")
+          print("    🔄 Trying fallback approach with fuzzy matching...")
           
           labels = await page.query_selector_all('label, [role="radio"]')
+          
+          # Define keywords based on preferred_option
+          if preferred_option:
+              preferred_lower = preferred_option.lower()
+              if "no" in preferred_lower and "not" not in preferred_lower:
+                  keywords = ["no", "don't have", "do not have"]
+              elif "yes" in preferred_lower or "have" in preferred_lower:
+                  keywords = ["yes", "have a disability", "disabled"]
+              else:
+                  keywords = ["not", "decline", "prefer", "don't", "do not", "choose not"]
+          else:
+              keywords = ["not", "decline", "prefer", "don't", "do not", "choose not"]
+          
+          print(f"      🔍 Using fallback keywords: {keywords}")
+          
           for label in labels:
               if await label.is_visible():
                   try:
                       label_text = await label.inner_text()
                       label_text = label_text.strip().lower()
                       
-                      # Check if label contains any of our keywords
-                      keywords = ["not", "decline", "prefer", "don't", "do not", "choose not"]
+                      # First try exact match with preferred_option if provided
+                      if preferred_option and preferred_option.lower() in label_text:
+                          await label.click()
+                          await asyncio.sleep(0.5)
+                          print(f"      ✅ Clicked fallback option matching preference: '{label_text}'")
+                          return True
+                      
+                      # Then try keyword matching
                       if any(keyword in label_text for keyword in keywords):
                           await label.click()
                           await asyncio.sleep(0.5)
-                          print(f"      ✅ Clicked fallback option: '{label_text}'")
+                          print(f"      ✅ Clicked fallback option with keyword match: '{label_text}'")
                           return True
                           
                   except Exception as e:
