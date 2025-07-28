@@ -45,36 +45,51 @@ playwright install chromium
 1. Create a `.env` file in the project root with your personal information:
 
 ```env
-# Personal Information
-REGISTRATION_FIRST_NAME=John
-REGISTRATION_LAST_NAME=Doe
-REGISTRATION_EMAIL=john.doe@email.com
-REGISTRATION_PHONE=1234567890
+WORKDAY_TENANT_URL=https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite
+WORKDAY_USERNAME=dummy128mailneeded@gmail.com
+WORKDAY_PASSWORD=SecurePassword@123
+JOB_URL=https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-CA%2C-Santa-Clara/Senior-Systems-Engineer--DriveAV---Autonomous-Vehicles_JR2000493/apply/applyManually?locationHierarchy1=2fcb99c455831013ea52fb338f2932d8
+RESUME_PATH=C:/Users/Lakshin Khurana/Downloads/Lin Mei_Experiened Level Software.pdf
+WORKDAY_END_URL=https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/jobTasks/completed/application
 
-# Professional Information
-CURRENT_COMPANY=Tech Corp
-CURRENT_ROLE=Software Engineer
-YEARS_EXPERIENCE=5
-PRIMARY_SKILLS=Python, JavaScript, React
+# Registration Configuration
+CREATE_ACCOUNT_MODE=true
+REGISTRATION_FIRST_NAME=Lin
+REGISTRATION_LAST_NAME=Mei
+JOB_BOARD=Indeed
+REGISTRATION_EMAIL=lmei53854@gmail.com
+REGISTRATION_PASSWORD=SecurePassword@123
+REGISTRATION_PHONE=650-450-8692
+
+# Personal Information from CV
+FULL_NAME=Lin Mei
+LOCATION=California, USA
+COUNTRY = United States Of America
+GITHUB_URL=https://github.com/navinAdhe
+CURRENT_POSITION=Software Engineer
+YEARS_EXPERIENCE=7+
 
 # Education
-EDUCATION_MASTERS=Computer Science
+EDUCATION_MASTERS=Master of Science in Computer Science - University of California, Davis, California, USA
+EDUCATION_BACHELORS=Bachelor of Engineering in Computer Science - University of Pune, Maharashtra, India
 
-# Location (optional)
-LOCATION=California, USA
-COUNTRY=United States
-STATE=California
+# Current Employment
+CURRENT_COMPANY=OSIsoft LLC, San Francisco Bay Area - USA
+CURRENT_ROLE=Sr. Software Developer
+EMPLOYMENT_PERIOD=Aug 2023 - Present
 
-# Job Application Settings
-WORKDAY_TENANT_URL=https://company.wd5.myworkdayjobs.com/en-US/careers
-JOB_BOARD=vidyapeeth
+# Previous Employment
+PREVIOUS_COMPANY=Cybage Software, Pune - India
+PREVIOUS_ROLE=Software Engineer
+PREVIOUS_PERIOD=Feb 2016 - Jun 2017
 
-# Voluntary Disclosures (optional)
-ETHNICITY=Prefer not to disclose
-GENDER=Prefer not to disclose
-VETERAN_STATUS=I am not a protected veteran
-DISABILITY_STATUS=I don't wish to answer
-```
+# Skills Summary
+PRIMARY_SKILLS=C#, TypeScript, Java, JavaScript, SQL, HTML5, CSS3, Python
+FRAMEWORKS=.NET Core, Angular 2+, RxJS, Entity Framework, React, Redux, Bootstrap 4
+CLOUD_PLATFORMS=Microsoft Azure, Azure Functions, App Services, Blob Storage
+DATABASES=SQL Server, Stored Procedures, Triggers, Functions
+TESTING_FRAMEWORKS=Jasmine, Karma, Cypress, Appium, Selenium
+DISABILITY_STATUS=I do not wish to answer```
 
 2. Update the `WORKDAY_TENANT_URL` with the specific company's Workday careers page URL.
 
