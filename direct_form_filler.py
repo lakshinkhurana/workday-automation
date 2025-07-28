@@ -3,13 +3,38 @@
 Direct Form Filler - Enhanced with button-based dropdown support
 """
 
+
 import os
+import sys
 import asyncio
 from turtle import delay
 from dotenv import load_dotenv
 import datetime
 
 load_dotenv()
+
+class AutomationCompleteException(Exception):
+    """Raised when automation should end due to reaching completion URL"""
+    def __init__(self, message="Automation complete"):
+        self.message = message
+        self.success = True
+        super().__init__(self.message)
+        
+    def display_completion_message(self):
+        """Display a formatted completion message"""
+        print("\n" + "="*80)
+        print("🎉 Workday Application Automation Complete! 🎉")
+        print(f"✨ Status: {'Success' if self.success else 'Failed'}")
+        print(f"✨ Message: {self.message}")
+        print("✨ Application process has been completed")
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"✨ Completed at: {current_time}")
+        print("="*80 + "\n")
+        if self.success:
+            sys.exit(0)  # Exit with success code
+        else:
+            sys.exit(1)  # Exit with error code
+
 
 class DirectFormFiller:
     """Direct form filling by id, data-automation-id, and name attributes with button dropdown support"""
@@ -79,10 +104,55 @@ class DirectFormFiller:
     async def fill_page_by_automation_id(self, page) -> int:
       """Fill all fields on page by finding them with id, data-automation-id, and name attributes"""
       print("  🎯 Direct form filling by id, data-automation-id, and name attributes...")
-    
-      await self._debug_page_fields(page)
-    
+      
+      try:
+          # Check for end URL first
+          await self.check_for_success_url(page)
+          
+          await self._debug_page_fields(page)
+      except AutomationCompleteException as e:
+          print("\n" + "="*80)
+          print("� Automation Completed Successfully! 🎉")
+          print("✨ All required forms have been filled")
+          print("✨ Application process is complete")
+          print("="*80 + "\n")
+          raise  # Re-raise the exception to be caught by the main automation loop
       self.filled_count = 0
+      
+      # Pre-check all fields for existing values
+      print("  🔍 Checking for already filled fields...")
+      already_filled = {}
+      for field_id, value in self.field_mappings.items():
+          if not value:
+              continue
+          try:
+              # Check input fields
+              selectors = [
+                  f'input[id="{field_id}"]',
+                  f'input[data-automation-id="{field_id}"]',
+                  f'button[id="{field_id}"]',
+                  f'select[id="{field_id}"]'
+              ]
+              for selector in selectors:
+                  element = await page.query_selector(selector)
+                  if element and await element.is_visible():
+                      if await element.get_attribute('type') in ['text', 'email', 'tel']:
+                          current_value = await element.input_value()
+                          if current_value.strip() == value.strip():
+                              print(f"    ✓ Field already correct: {field_id} = {value}")
+                              already_filled[field_id] = True
+                              self.filled_count += 1
+                              break
+                      elif await element.get_attribute('role') == 'button':
+                          button_text = await element.inner_text()
+                          if button_text.strip().lower() == value.strip().lower():
+                              print(f"    ✓ Button already correct: {field_id} = {value}")
+                              already_filled[field_id] = True
+                              self.filled_count += 1
+                              break
+          except Exception as e:
+              print(f"    ⚠️ Error checking field {field_id}: {str(e)}")
+              continue
     
       # Check if we're on the Self Identity page
       is_self_identity_page = await self._is_self_identity_page(page)
@@ -98,13 +168,15 @@ class DirectFormFiller:
     
     # Continue with regular field filling for other pages
       for field_id, value in self.field_mappings.items():
-        if value:
+        if value and field_id not in already_filled:
             success = await self._fill_field_by_id(page, field_id, value)
             if success:
                 self.filled_count += 1
                 print(f"    ✅ {field_id}: {value}")
             else:
                 print(f"    ⚠️ Not found: {field_id}")
+        elif field_id in already_filled:
+            print(f"    ↷ Skipping already filled field: {field_id}")
     
       print(f"  ✅ Direct filling complete: {self.filled_count} fields filled")
       return self.filled_count
@@ -991,6 +1063,13 @@ class DirectFormFiller:
     async def submit_form(self, page) -> bool:
         """Submit the form after filling"""
         
+        # Check if we've reached the end URL
+        current_url = page.url
+        end_url = os.getenv('WORKDAY_END_URL')
+        if end_url and current_url.startswith(end_url):
+            print("  🎉 Reached completion URL - ending automation")
+            raise AutomationCompleteException("Automation complete - reached end URL")
+            
         print("  🚀 Submitting form...")
         
         submit_selectors = [
@@ -1334,6 +1413,15 @@ class DirectFormFiller:
             return False
 
     async def check_for_success_url(self, page) -> bool:
+        """Check if we've reached the end URL and raise exception if so"""
+        current_url = page.url
+        end_url = os.getenv('WORKDAY_END_URL')
+        if end_url and current_url.startswith(end_url):
+            print("  🎉 Reached completion URL - ending automation")
+            complete_exception = AutomationCompleteException("Successfully completed the application process")
+            complete_exception.display_completion_message()  # This will also exit the program
+            print("  🎉 Reached completion URL - ending automation")
+            raise Exception("Automation complete - reached end URL")
         """Check if current URL matches the success URL"""
         try:
             # Get success URL from environment
