@@ -36,6 +36,14 @@ class AutomationCompleteException(Exception):
             sys.exit(1)  # Exit with error code
 
 
+# Cache common imports
+from functools import lru_cache
+import re
+import os
+import asyncio
+import datetime
+from typing import Dict, List, Optional
+
 class DirectFormFiller:
     """Direct form filling by id, data-automation-id, and name attributes with button dropdown support"""
     
@@ -630,8 +638,9 @@ class DirectFormFiller:
             print(f"        ❌ Error selecting dropdown option: {str(e)}")
             return False
     
+    @lru_cache(maxsize=1024)
     def _fuzzy_match(self, value1: str, value2: str) -> bool:
-        """Simple fuzzy matching for dropdown options"""
+        """Simple fuzzy matching for dropdown options with caching"""
         
         # Remove common words and punctuation
         stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'not', 'select', 'one', 'choose', 'please'}
