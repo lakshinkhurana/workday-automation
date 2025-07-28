@@ -85,7 +85,7 @@ DISABILITY_STATUS=I don't wish to answer
 Run the main automation script:
 
 ```bash
-python flow.py
+python main.py
 ```
 
 ### Direct Form Filling
@@ -100,9 +100,12 @@ python direct_form_filler.py
 
 ```
 workday-automation/
-├── flow.py                     # Main automation flow
+├── .gitignore
+├── main.py                     # Main automation flow
 ├── direct_form_filler.py       # Direct form filling logic
-├── manual_login.py            # Manual login utilities
+├── config_manager.py       
+├── resume_fill.py
+├── performance_monitor.py       
 ├── .env                       # Environment variables (create this)
 ├── workday_forms_complete.json # Extracted form data
 ├── README.md                  # This file
