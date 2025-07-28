@@ -47,8 +47,24 @@ from typing import Dict, List, Optional
 class DirectFormFiller:
     """Direct form filling by id, data-automation-id, and name attributes with button dropdown support"""
     
+    def _determine_age_group(self) -> str:
+        """Determine age group based on AGE environment variable"""
+        try:
+            age = int(os.getenv('AGE', '0'))
+            if age < 16:
+                return 'Under 16 years of age'
+            elif 16 <= age <= 17:
+                return '16-17 years of age'
+            elif age >= 18:
+                return '18 years of age and Over'
+            return ''  # Default empty if age is invalid
+        except ValueError:
+            print("    ⚠️ Invalid age value in environment variable")
+            return ''
+    
     def __init__(self):
         self.filled_count = 0
+        
         
         # Set up today's date for form filling
         from datetime import datetime
@@ -57,6 +73,14 @@ class DirectFormFiller:
         today_day = str(today.day)
         today_year = str(today.year)
         today_full_date = f"{today_month}{today_day}{today_year}"
+        qualification='Do you certify you meet all minimum qualifications for this job as outlined in the job posting? If you do not recall the minimum qualification for this job, please review the job posting prior to answering this question'
+        messages='''
+        Would you like to receive mobile text message updates relating to your employment relationship with Walmart? If so, choose to Opt-in below.
+
+Your response to this question will replace any response you’ve provided on previous job applications. If you previously selected Opt-in and now choose to Opt-out, you will not receive text messages for active employment applications. If you choose to Opt-out previously and now choose to Opt-in, you will begin to receive text messages for active employment regarding application status and updates as a new associate.
+
+Message and data rates may apply. Message frequency may vary. Text STOP to cancel text message updates. For assistance, text HELP or contact People Services at 1-888-596-2365 for additional support. View our mobile terms and privacy notice. Review the Terms & Conditions in the following pages of this application.
+        '''
         
         # Direct mapping of field id to environment variable
         self.field_mappings = {
@@ -107,6 +131,24 @@ class DirectFormFiller:
             
             # Terms and Conditions checkbox
             'termsAndConditions--acceptTermsAndAgreements': 'true',
+
+            # Application questions
+            qualification: os.getenv('WALMART_QUALIFICATIONS', 'Yes'),
+            
+            messages: os.getenv('WALMART_MESSAGES', 'Opt-Out from receiving text messages from Walmart'),
+            
+            'Are you legally able to work in the country where this job is located?': os.getenv('WALMART_WORK_ELLIGIBILITY', 'Yes'),
+            
+            'Please select your age category:': self._determine_age_group(),
+            
+            'Please select your Walmart Associate Status/Affiliation:': os.getenv('WALMART_AFFILATION', 'Have never been an employee of Walmart Inc or any of its subsidiaries'),
+            
+            'Will you now or in the future require "sponsorship for an immigration-related employment benefit"?    For purposes of this question "sponsorship for an immigration-related employment benefit" means: an H-1B, TN, L-1 or STEM Extension. (Please ask if you are uncertain whether you may need immigration sponsorship or desire clarification.)':os.getenv('REQUIRE_SPONSORSHIP', 'Yes'),
+            
+            'The following questions are to assist Walmart in determining your eligibility for its industry-leading hiring program for service members from any branch of the Uniformed Services of the United States and military spouses.  If you do not wish to answer these questions, please indicate below, and you can skip this portion of the application process.  If you provide the information on military status, it will not be considered in determining your qualification for any particular position.  Veterans and military spouses may be required to provide proof of their status, such as a DD 214 or Department of Defense Dependent Identification Card, to determine eligibility for this special hiring initiative.  *Uniformed Services are defined as the Army, Navy, Air Force, Marine Corps, Coast Guard, Public Health Service (Commissioned Corps) and the National Oceanic and Atmospheric Administration.  Do you have Active Duty or Guard/Reserve experience in the Uniformed Services of the United States?': os.getenv('ACTIVE_DUTY_STATUS', 'No'),
+            
+            "Do you have a direct family member who currently works for Walmart or Sam's Club?": os.getenv('FAMILY_MEMBER_WORKS_AT_WALMART', 'No'),
+
         }
     
     async def fill_page_by_automation_id(self, page) -> int:
@@ -467,6 +509,11 @@ class DirectFormFiller:
                 print(f"      🔍 Handling radio button group for: {field_id}")
                 return await self._handle_radio_by_id(page, field_id, value)
             
+            # Try fill by question text as a last resort if the field_id looks like a question
+            if '?' in field_id or len(field_id) > 20:
+                print(f"      🔍 Trying fill by question text for: {field_id}")
+                return await self.fill_by_question_text(page, field_id, value)
+            
             print(f"    ❌ No matching element found for field: {field_id}")
             return False
             
@@ -638,6 +685,118 @@ class DirectFormFiller:
             print(f"        ❌ Error selecting dropdown option: {str(e)}")
             return False
     
+    async def fill_by_question_text(self, page, question_text: str, answer_value: str) -> bool:
+        """
+        Find a button below specific question text and fill it with the given answer.
+        
+        Args:
+            page: The page object
+            question_text: The text of the question to look for
+            answer_value: The value to select/enter in the associated button/input
+            
+        Returns:
+            bool: True if successfully filled, False otherwise
+        """
+        print(f"    🔍 Looking for question: '{question_text[:50]}...'")
+        
+        try:
+            # First locate the question text
+            escaped_text = question_text.replace('"', '\\"').replace("'", "\\'")
+            selectors = [
+                f"text='{escaped_text}'",
+                f'text="{escaped_text}"',
+                f"div:has-text('{escaped_text}')",
+                f'label:has-text("{escaped_text}")',
+                f'span:has-text("{escaped_text}")',
+                f'p:has-text("{escaped_text}")'
+            ]
+            
+            question_element = None
+            for selector in selectors:
+                try:
+                    elements = await page.query_selector_all(selector)
+                    for element in elements:
+                        if await element.is_visible():
+                            element_text = await element.inner_text()
+                            if question_text.lower() in element_text.lower():
+                                question_element = element
+                                print(f"        ✅ Found question element with text: '{element_text[:50]}...'")
+                                break
+                    if question_element:
+                        break
+                except Exception as e:
+                    continue
+            
+            if not question_element:
+                print(f"        ❌ Could not find question text: {question_text[:50]}...")
+                return False
+                
+            # Get the bounding box of the question element
+            question_box = await question_element.bounding_box()
+            if not question_box:
+                print("        ❌ Could not get question element position")
+                return False
+                
+            # Look for the nearest button/input below the question
+            button_selectors = [
+                'button[aria-haspopup="listbox"]',
+                'input[type="text"]',
+                'select',
+                'button'
+            ]
+            
+            closest_element = None
+            min_distance = float('inf')
+            
+            for selector in button_selectors:
+                elements = await page.query_selector_all(selector)
+                for element in elements:
+                    if await element.is_visible():
+                        element_box = await element.bounding_box()
+                        if element_box:
+                            # Check if the element is below the question
+                            vertical_distance = element_box['y'] - (question_box['y'] + question_box['height'])
+                            horizontal_overlap = (
+                                element_box['x'] < (question_box['x'] + question_box['width']) and
+                                (element_box['x'] + element_box['width']) > question_box['x']
+                            )
+                            
+                            if vertical_distance > 0 and vertical_distance < min_distance and horizontal_overlap:
+                                min_distance = vertical_distance
+                                closest_element = element
+                                print(f"        ✅ Found potential input element {vertical_distance}px below question")
+            
+            if not closest_element:
+                print("        ❌ Could not find any input element below the question")
+                return False
+                
+            # Handle the found element based on its type
+            tag_name = await closest_element.evaluate('element => element.tagName.toLowerCase()')
+            
+            if tag_name == 'button':
+                # If it's a button, it's likely a dropdown
+                await closest_element.click()
+                await asyncio.sleep(0.5)
+                success = await self._select_dropdown_option_from_listbox(page, answer_value, "dynamic-button")
+                return success
+                
+            elif tag_name == 'input':
+                # If it's an input, type the value
+                await closest_element.click()
+                await closest_element.fill(answer_value)
+                return True
+                
+            elif tag_name == 'select':
+                # If it's a select, use select_option
+                await closest_element.select_option(label=answer_value)
+                return True
+                
+            return False
+            
+        except Exception as e:
+            print(f"        ❌ Error in fill_by_question_text: {str(e)}")
+            return False
+
     @lru_cache(maxsize=1024)
     def _fuzzy_match(self, value1: str, value2: str) -> bool:
         """Simple fuzzy matching for dropdown options with caching"""
