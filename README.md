@@ -89,7 +89,8 @@ FRAMEWORKS=.NET Core, Angular 2+, RxJS, Entity Framework, React, Redux, Bootstra
 CLOUD_PLATFORMS=Microsoft Azure, Azure Functions, App Services, Blob Storage
 DATABASES=SQL Server, Stored Procedures, Triggers, Functions
 TESTING_FRAMEWORKS=Jasmine, Karma, Cypress, Appium, Selenium
-DISABILITY_STATUS=I do not wish to answer```
+DISABILITY_STATUS=I do not wish to answer
+```
 
 2. Update the `WORKDAY_TENANT_URL` with the specific company's Workday careers page URL.
 
