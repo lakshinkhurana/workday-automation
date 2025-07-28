@@ -28,13 +28,13 @@ class DirectFormFiller:
         # Direct mapping of field id to environment variable
         self.field_mappings = {
             # My Information page fields
-            # 'name--legalName--firstName': os.getenv('REGISTRATION_FIRST_NAME', ''),
-            # 'name--legalName--lastName': os.getenv('REGISTRATION_LAST_NAME', ''),
-            # 'email': os.getenv('REGISTRATION_EMAIL', ''),
-            # 'phoneNumber--phoneNumber': os.getenv('REGISTRATION_PHONE', ''),
+            'name--legalName--firstName': os.getenv('REGISTRATION_FIRST_NAME', ''),
+            'name--legalName--lastName': os.getenv('REGISTRATION_LAST_NAME', ''),
+            'email': os.getenv('REGISTRATION_EMAIL', ''),
+            'phoneNumber--phoneNumber': os.getenv('REGISTRATION_PHONE', ''),
             'phoneNumber--phoneDeviceType': 'Home',
-            # 'phoneNumber--countryPhoneCode': '+1',
-            # 'phoneNumber--extension': '',
+            'phoneNumber--countryPhoneCode': '+1',
+            'phoneNumber--extension': '',
             'country--country': 'United States',
             'source--source': os.getenv('JOB_BOARD',''),
             'candidateIsPreviousWorker': 'No',
@@ -56,14 +56,13 @@ class DirectFormFiller:
             # 'dateSectionYear-input': today_year,
             
             # Professional fields
-            # 'currentCompany': os.getenv('CURRENT_COMPANY', ''),
-            # 'currentRole': os.getenv('CURRENT_ROLE', ''),
-            # 'workExperience': os.getenv('YEARS_EXPERIENCE', ''),
-            # 'skills': os.getenv('PRIMARY_SKILLS', ''),
-            # 'education': os.getenv('EDUCATION_MASTERS', ''),
-            # 'github': os.getenv('GITHUB_URL', ''),
-            # 'workAuthorization': 'Yes',
-            # 'visaStatus': 'US Citizen',
+            'currentCompany': os.getenv('CURRENT_COMPANY', ''),
+            'currentRole': os.getenv('CURRENT_ROLE', ''),
+            'skills': os.getenv('PRIMARY_SKILLS', ''),
+            'education': os.getenv('EDUCATION_MASTERS', ''),
+            'github': os.getenv('GITHUB_URL', ''),
+            'workAuthorization': 'Yes',
+            'visaStatus': 'US Citizen',
             'requiresSponsorship': 'No',
 
             # Personal info with button dropdown support
@@ -192,6 +191,52 @@ class DirectFormFiller:
         """Fill a specific field by its id, data-automation-id, or name attributes"""
         
         print(f"    🔍 Attempting to fill field '{field_id}' with value '{value}'")
+        
+        # Check for existing value before filling
+        try:
+            # Check input fields
+            input_selectors = [
+                f'input[id="{field_id}"]',
+                f'input[data-automation-id="{field_id}"]',
+                f'input[name="{field_id}"]'
+            ]
+            for selector in input_selectors:
+                element = await page.query_selector(selector)
+                if element and await element.is_visible():
+                    current_value = await element.input_value()
+                    if current_value.strip() == value.strip():
+                        print(f"    ✅ Field '{field_id}' already has correct value: '{value}'")
+                        return True
+            
+            # Check button dropdowns
+            button_selectors = [
+                f'button[id="{field_id}"]',
+                f'button[data-automation-id="{field_id}"]'
+            ]
+            for selector in button_selectors:
+                element = await page.query_selector(selector)
+                if element and await element.is_visible():
+                    button_text = await element.inner_text()
+                    if button_text.strip().lower() == value.strip().lower():
+                        print(f"    ✅ Button '{field_id}' already has correct value: '{value}'")
+                        return True
+            
+            # Check select elements
+            select_selectors = [
+                f'select[id="{field_id}"]',
+                f'select[data-automation-id="{field_id}"]'
+            ]
+            for selector in select_selectors:
+                element = await page.query_selector(selector)
+                if element and await element.is_visible():
+                    selected_option = await element.evaluate('el => el.options[el.selectedIndex].text')
+                    if selected_option and selected_option.strip().lower() == value.strip().lower():
+                        print(f"    ✅ Select '{field_id}' already has correct value: '{value}'")
+                        return True
+        except Exception as e:
+            print(f"    ⚠️ Error checking existing value: {str(e)}")
+        
+        # If no matching value found, proceed with filling
         
         # Check if this is a button dropdown first (highest priority)
         button_dropdown_success = await self._handle_button_dropdown_by_id(page, field_id, value)

@@ -1,45 +1,33 @@
 {
   "extraction_metadata": {
-    "timestamp": "2025-07-28 00:59:27",
+    "timestamp": "2025-07-28 17:13:24",
     "tenant_url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite",
-    "total_pages_crawled": 7,
-    "total_form_elements": 54
+    "total_pages_crawled": 5,
+    "total_form_elements": 46
   },
   "pages_visited": [
     {
-      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-CA%2C-Santa-Clara/Data-Analyst--Finance_JR1996671/apply/autofillWithResume",
-      "title": "Data Analyst, Finance",
+      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/UK%2C-Reading/Senior-Partner-Business-Manager--UK_JR2000426/apply/autofillWithResume",
+      "title": "Senior Partner Business Manager, UK",
       "page_type": "Job Application",
       "form_count": 7
     },
     {
-      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-CA%2C-Santa-Clara/Data-Analyst--Finance_JR1996671/apply/autofillWithResume",
-      "title": "Data Analyst, Finance - Data Analyst, Finance",
-      "page_type": "Data Analyst, Finance",
+      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/UK%2C-Reading/Senior-Partner-Business-Manager--UK_JR2000426/apply/autofillWithResume",
+      "title": "Senior Partner Business Manager, UK - Senior Partner Business Manager, UK",
+      "page_type": "Senior Partner Business Manager, UK",
       "form_count": 38
     },
     {
-      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-CA%2C-Santa-Clara/Data-Analyst--Finance_JR1996671/apply/autofillWithResume",
-      "title": "Data Analyst, Finance - Data Analyst, Finance",
-      "page_type": "Data Analyst, Finance",
-      "form_count": 0
-    },
-    {
-      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-CA%2C-Santa-Clara/Data-Analyst--Finance_JR1996671/apply/autofillWithResume",
-      "title": "Data Analyst, Finance - Data Analyst, Finance",
-      "page_type": "Data Analyst, Finance",
+      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/UK%2C-Reading/Senior-Partner-Business-Manager--UK_JR2000426/apply/autofillWithResume",
+      "title": "Senior Partner Business Manager, UK - Senior Partner Business Manager, UK",
+      "page_type": "Senior Partner Business Manager, UK",
       "form_count": 1
     },
     {
-      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-CA%2C-Santa-Clara/Data-Analyst--Finance_JR1996671/apply/autofillWithResume",
-      "title": "Data Analyst, Finance - Data Analyst, Finance",
-      "page_type": "Data Analyst, Finance",
-      "form_count": 8
-    },
-    {
-      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/jobTasks/completed/application",
-      "title": "Candidate Home - Candidate Home",
-      "page_type": "Candidate Home",
+      "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/UK%2C-Reading/Senior-Partner-Business-Manager--UK_JR2000426/apply/autofillWithResume",
+      "title": "Senior Partner Business Manager, UK - Senior Partner Business Manager, UK",
+      "page_type": "Senior Partner Business Manager, UK",
       "form_count": 0
     },
     {
@@ -413,70 +401,6 @@
     {
       "label": "Unlabeled Field",
       "id_of_input_component": "termsAndConditions--acceptTermsAndAgreements",
-      "required": true,
-      "type_of_input": "checkbox",
-      "options": [],
-      "user_data_select_values": []
-    },
-    {
-      "label": "Unlabeled Field",
-      "id_of_input_component": "selfIdentifiedDisabilityData--name",
-      "required": true,
-      "type_of_input": "text",
-      "options": [],
-      "user_data_select_values": []
-    },
-    {
-      "label": "Unlabeled Field",
-      "id_of_input_component": "selfIdentifiedDisabilityData--employeeId",
-      "required": false,
-      "type_of_input": "text",
-      "options": [],
-      "user_data_select_values": []
-    },
-    {
-      "label": "Month",
-      "id_of_input_component": "dateSectionMonth-input",
-      "required": false,
-      "type_of_input": "text",
-      "options": [],
-      "user_data_select_values": []
-    },
-    {
-      "label": "Day",
-      "id_of_input_component": "dateSectionDay-input",
-      "required": false,
-      "type_of_input": "text",
-      "options": [],
-      "user_data_select_values": []
-    },
-    {
-      "label": "Year",
-      "id_of_input_component": "dateSectionYear-input",
-      "required": false,
-      "type_of_input": "text",
-      "options": [],
-      "user_data_select_values": []
-    },
-    {
-      "label": "Unlabeled Field",
-      "id_of_input_component": "64cbff5f364f10000ae7a421cf210000-disabilityStatus",
-      "required": true,
-      "type_of_input": "checkbox",
-      "options": [],
-      "user_data_select_values": []
-    },
-    {
-      "label": "Unlabeled Field",
-      "id_of_input_component": "64cbff5f364f10000aeec521b4ec0000-disabilityStatus",
-      "required": true,
-      "type_of_input": "checkbox",
-      "options": [],
-      "user_data_select_values": []
-    },
-    {
-      "label": "Unlabeled Field",
-      "id_of_input_component": "64cbff5f364f10000af3af293a050000-disabilityStatus",
       "required": true,
       "type_of_input": "checkbox",
       "options": [],

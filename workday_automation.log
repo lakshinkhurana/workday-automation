@@ -1,0 +1,106 @@
+2025-07-28 00:54:01,369 - config_manager.ConfigurationManager - INFO - Loading configuration from JSON files and environment variables
+2025-07-28 00:54:01,369 - config_manager.ConfigurationManager - INFO - Configuration validation passed
+2025-07-28 00:54:01,370 - config_manager.ConfigurationManager - INFO - Default values applied to configuration
+2025-07-28 00:54:01,370 - config_manager.ConfigurationManager - INFO - Configuration loaded successfully
+2025-07-28 00:54:01,370 - performance_monitor - INFO - Performance Monitor initialized
+2025-07-28 00:54:01,370 - __main__.WorkdayPageAutomator - INFO - Configuration applied - Headless: True, Debug: False, Max retries: 3
+2025-07-28 00:54:01,373 - __main__.WorkdayPageAutomator - INFO - WorkdayPageAutomator initialized with configuration management and performance monitoring
+2025-07-28 00:54:01,374 - __main__.WorkdayPageAutomator - INFO - Starting Workday page automation
+2025-07-28 00:54:01,375 - performance_monitor - INFO - Performance monitoring started for automation: workday_automation_1753644241
+2025-07-28 00:54:01,375 - __main__.WorkdayPageAutomator - INFO - Step 1: Account Creation
+2025-07-28 00:54:01,375 - __main__.WorkdayPageAutomator - INFO - Starting account creation using WorkdayFormScraper
+2025-07-28 00:54:01,376 - __main__.WorkdayPageAutomator - INFO - Executing WorkdayFormScraper.run() for account creation
+2025-07-28 00:59:27,976 - __main__.WorkdayPageAutomator - INFO - Account creation completed successfully
+2025-07-28 00:59:27,977 - __main__.WorkdayPageAutomator - INFO - Validating account creation status
+2025-07-28 00:59:27,977 - __main__.WorkdayPageAutomator - INFO - Account validation successful - 7 pages crawled, 54 form elements extracted
+2025-07-28 00:59:27,977 - __main__.WorkdayPageAutomator - INFO - Account validation successful
+2025-07-28 00:59:27,978 - performance_monitor - INFO - Performance: account_creation took 326.60s, memory delta: 7.86MB
+2025-07-28 00:59:27,978 - __main__.WorkdayPageAutomator - INFO - Step 2: Account Status Validation
+2025-07-28 00:59:27,978 - __main__.WorkdayPageAutomator - INFO - Account creation and validation successful
+2025-07-28 00:59:27,979 - __main__.WorkdayPageAutomator - INFO - Step 3: Page Processing with Performance Monitoring
+2025-07-28 00:59:27,979 - __main__.WorkdayPageAutomator - INFO - Starting page processing with performance monitoring
+2025-07-28 00:59:27,979 - __main__.WorkdayPageAutomator - ERROR - Page processing failed: 'WorkdayPageAutomator' object has no attribute '_discover_pages_dynamically'
+2025-07-28 00:59:27,979 - __main__.WorkdayPageAutomator - ERROR - Page processing failed
+2025-07-28 00:59:28,048 - performance_monitor - INFO - Performance monitoring stopped
+2025-07-28 00:59:28,052 - performance_monitor - INFO - Performance: run_automation took 326.68s, memory delta: 7.95MB
+2025-07-28 00:59:28,052 - __main__ - ERROR - Workday automation failed
+2025-07-28 17:01:05,868 - config_manager.ConfigurationManager - INFO - Loading configuration from JSON files and environment variables
+2025-07-28 17:01:05,869 - config_manager.ConfigurationManager - INFO - Configuration validation passed
+2025-07-28 17:01:05,869 - config_manager.ConfigurationManager - INFO - Default values applied to configuration
+2025-07-28 17:01:05,869 - config_manager.ConfigurationManager - INFO - Configuration loaded successfully
+2025-07-28 17:01:05,870 - performance_monitor - INFO - Performance Monitor initialized
+2025-07-28 17:01:05,870 - __main__.WorkdayPageAutomator - INFO - Configuration applied - Headless: True, Debug: False, Max retries: 3
+2025-07-28 17:01:05,870 - __main__.WorkdayPageAutomator - INFO - WorkdayPageAutomator initialized with configuration management and performance monitoring
+2025-07-28 17:01:05,871 - __main__.WorkdayPageAutomator - INFO - Starting Workday page automation
+2025-07-28 17:01:05,872 - performance_monitor - INFO - Performance monitoring started for automation: workday_automation_1753702265
+2025-07-28 17:01:05,872 - __main__.WorkdayPageAutomator - INFO - Step 1: Account Creation
+2025-07-28 17:01:05,873 - __main__.WorkdayPageAutomator - INFO - Starting account creation using WorkdayFormScraper
+2025-07-28 17:01:05,873 - __main__.WorkdayPageAutomator - INFO - Executing WorkdayFormScraper.run() for account creation
+2025-07-28 17:01:29,767 - __main__.WorkdayPageAutomator - INFO - Account creation completed successfully
+2025-07-28 17:01:29,767 - __main__.WorkdayPageAutomator - INFO - Validating account creation status
+2025-07-28 17:01:29,767 - __main__.WorkdayPageAutomator - WARNING - No pages were visited during account creation
+2025-07-28 17:01:29,767 - __main__.WorkdayPageAutomator - WARNING - Account created but validation failed
+2025-07-28 17:01:29,767 - __main__.ErrorHandler - ERROR - Account Creation failed: Account validation failed
+2025-07-28 17:01:29,768 - __main__.ErrorHandler - INFO - Existing account detected - graceful degradation: treating as successful
+2025-07-28 17:01:29,768 - performance_monitor - INFO - Performance: account_creation took 23.89s, memory delta: 4.23MB
+2025-07-28 17:01:29,768 - __main__.WorkdayPageAutomator - INFO - Step 2: Account Status Validation
+2025-07-28 17:01:29,768 - __main__.WorkdayPageAutomator - INFO - Account creation and validation successful
+2025-07-28 17:01:29,768 - __main__.WorkdayPageAutomator - INFO - Step 3: Page Processing with Performance Monitoring
+2025-07-28 17:01:29,768 - __main__.WorkdayPageAutomator - INFO - Starting page processing with performance monitoring
+2025-07-28 17:01:29,768 - __main__.WorkdayPageAutomator - ERROR - Page processing failed: 'WorkdayPageAutomator' object has no attribute '_discover_pages_dynamically'
+2025-07-28 17:01:29,769 - __main__.WorkdayPageAutomator - ERROR - Page processing failed
+2025-07-28 17:01:29,924 - performance_monitor - INFO - Performance monitoring stopped
+2025-07-28 17:01:29,925 - performance_monitor - INFO - Performance: run_automation took 24.05s, memory delta: 4.33MB
+2025-07-28 17:01:29,925 - __main__ - ERROR - Workday automation failed
+2025-07-28 17:01:36,236 - config_manager.ConfigurationManager - INFO - Loading configuration from JSON files and environment variables
+2025-07-28 17:01:36,237 - config_manager.ConfigurationManager - INFO - Configuration validation passed
+2025-07-28 17:01:36,237 - config_manager.ConfigurationManager - INFO - Default values applied to configuration
+2025-07-28 17:01:36,237 - config_manager.ConfigurationManager - INFO - Configuration loaded successfully
+2025-07-28 17:01:36,238 - performance_monitor - INFO - Performance Monitor initialized
+2025-07-28 17:01:36,238 - __main__.WorkdayPageAutomator - INFO - Configuration applied - Headless: True, Debug: False, Max retries: 3
+2025-07-28 17:01:36,238 - __main__.WorkdayPageAutomator - INFO - WorkdayPageAutomator initialized with configuration management and performance monitoring
+2025-07-28 17:01:36,238 - __main__.WorkdayPageAutomator - INFO - Starting Workday page automation
+2025-07-28 17:01:36,240 - performance_monitor - INFO - Performance monitoring started for automation: workday_automation_1753702296
+2025-07-28 17:01:36,240 - __main__.WorkdayPageAutomator - INFO - Step 1: Account Creation
+2025-07-28 17:01:36,240 - __main__.WorkdayPageAutomator - INFO - Starting account creation using WorkdayFormScraper
+2025-07-28 17:01:36,240 - __main__.WorkdayPageAutomator - INFO - Executing WorkdayFormScraper.run() for account creation
+2025-07-28 17:05:02,584 - __main__.WorkdayPageAutomator - INFO - Account creation completed successfully
+2025-07-28 17:05:02,586 - __main__.WorkdayPageAutomator - INFO - Validating account creation status
+2025-07-28 17:05:02,587 - __main__.WorkdayPageAutomator - INFO - Account validation successful - 5 pages crawled, 46 form elements extracted
+2025-07-28 17:05:02,589 - __main__.WorkdayPageAutomator - INFO - Account validation successful
+2025-07-28 17:05:02,591 - performance_monitor - INFO - Performance: account_creation took 206.35s, memory delta: 7.98MB
+2025-07-28 17:05:02,610 - __main__.WorkdayPageAutomator - INFO - Step 2: Account Status Validation
+2025-07-28 17:05:02,612 - __main__.WorkdayPageAutomator - INFO - Account creation and validation successful
+2025-07-28 17:05:02,613 - __main__.WorkdayPageAutomator - INFO - Step 3: Page Processing with Performance Monitoring
+2025-07-28 17:05:02,615 - __main__.WorkdayPageAutomator - INFO - Starting page processing with performance monitoring
+2025-07-28 17:05:02,620 - __main__.WorkdayPageAutomator - ERROR - Page processing failed: 'WorkdayPageAutomator' object has no attribute '_discover_pages_dynamically'
+2025-07-28 17:05:02,623 - __main__.WorkdayPageAutomator - ERROR - Page processing failed
+2025-07-28 17:05:03,488 - performance_monitor - INFO - Performance monitoring stopped
+2025-07-28 17:05:03,695 - performance_monitor - INFO - Performance: run_automation took 207.46s, memory delta: 8.07MB
+2025-07-28 17:05:03,695 - __main__ - ERROR - Workday automation failed
+2025-07-28 17:08:24,549 - config_manager.ConfigurationManager - INFO - Loading configuration from JSON files and environment variables
+2025-07-28 17:08:24,549 - config_manager.ConfigurationManager - INFO - Configuration validation passed
+2025-07-28 17:08:24,549 - config_manager.ConfigurationManager - INFO - Default values applied to configuration
+2025-07-28 17:08:24,549 - config_manager.ConfigurationManager - INFO - Configuration loaded successfully
+2025-07-28 17:08:24,550 - performance_monitor - INFO - Performance Monitor initialized
+2025-07-28 17:08:24,550 - __main__.WorkdayPageAutomator - INFO - Configuration applied - Headless: True, Debug: False, Max retries: 3
+2025-07-28 17:08:24,550 - __main__.WorkdayPageAutomator - INFO - WorkdayPageAutomator initialized with configuration management and performance monitoring
+2025-07-28 17:08:24,550 - __main__.WorkdayPageAutomator - INFO - Starting Workday page automation
+2025-07-28 17:08:24,551 - performance_monitor - INFO - Performance monitoring started for automation: workday_automation_1753702704
+2025-07-28 17:08:24,551 - __main__.WorkdayPageAutomator - INFO - Step 1: Account Creation
+2025-07-28 17:08:24,552 - __main__.WorkdayPageAutomator - INFO - Starting account creation using WorkdayFormScraper
+2025-07-28 17:08:24,552 - __main__.WorkdayPageAutomator - INFO - Executing WorkdayFormScraper.run() for account creation
+2025-07-28 17:13:24,771 - __main__.WorkdayPageAutomator - INFO - Account creation completed successfully
+2025-07-28 17:13:24,772 - __main__.WorkdayPageAutomator - INFO - Validating account creation status
+2025-07-28 17:13:24,772 - __main__.WorkdayPageAutomator - INFO - Account validation successful - 5 pages crawled, 46 form elements extracted
+2025-07-28 17:13:24,772 - __main__.WorkdayPageAutomator - INFO - Account validation successful
+2025-07-28 17:13:24,772 - performance_monitor - INFO - Performance: account_creation took 300.22s, memory delta: 9.35MB
+2025-07-28 17:13:24,773 - __main__.WorkdayPageAutomator - INFO - Step 2: Account Status Validation
+2025-07-28 17:13:24,773 - __main__.WorkdayPageAutomator - INFO - Account creation and validation successful
+2025-07-28 17:13:24,773 - __main__.WorkdayPageAutomator - INFO - Step 3: Page Processing with Performance Monitoring
+2025-07-28 17:13:24,774 - __main__.WorkdayPageAutomator - INFO - Starting page processing with performance monitoring
+2025-07-28 17:13:24,774 - __main__.WorkdayPageAutomator - ERROR - Page processing failed: 'WorkdayPageAutomator' object has no attribute '_discover_pages_dynamically'
+2025-07-28 17:13:24,774 - __main__.WorkdayPageAutomator - ERROR - Page processing failed
+2025-07-28 17:13:25,698 - performance_monitor - INFO - Performance monitoring stopped
+2025-07-28 17:13:25,698 - performance_monitor - INFO - Performance: run_automation took 301.15s, memory delta: 9.43MB
+2025-07-28 17:13:25,698 - __main__ - ERROR - Workday automation failed

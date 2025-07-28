@@ -42,16 +42,24 @@ An automated form filling system for Workday job applications that streamlines t
 Create a `.env` file in the project root with your personal information:
 
 ```env
+<<<<<<< HEAD
 # Workday Configuration
+=======
+>>>>>>> 4cbfa38f73e545223e2a3c564ee64bb194965d8e
 WORKDAY_TENANT_URL=https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite
 WORKDAY_USERNAME=dummy128mailneeded@gmail.com
 WORKDAY_PASSWORD=SecurePassword@123
 JOB_URL=https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-CA%2C-Santa-Clara/Senior-Systems-Engineer--DriveAV---Autonomous-Vehicles_JR2000493/apply/applyManually?locationHierarchy1=2fcb99c455831013ea52fb338f2932d8
+<<<<<<< HEAD
 RESUME_PATH=C:/Users/YourName/Downloads/your_resume.pdf
+=======
+RESUME_PATH=C:/Users/Lakshin Khurana/Downloads/Lin Mei_Experiened Level Software.pdf
+>>>>>>> 4cbfa38f73e545223e2a3c564ee64bb194965d8e
 WORKDAY_END_URL=https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/jobTasks/completed/application
 
 # Registration Configuration
 CREATE_ACCOUNT_MODE=true
+<<<<<<< HEAD
 REGISTRATION_FIRST_NAME=Your_First_Name
 REGISTRATION_LAST_NAME=Your_Last_Name
 JOB_BOARD=Indeed
@@ -89,6 +97,43 @@ DATABASES=PostgreSQL, MySQL, MongoDB
 TESTING_FRAMEWORKS=Jest, Pytest, Selenium
 
 # Personal Preferences
+=======
+REGISTRATION_FIRST_NAME=Lin
+REGISTRATION_LAST_NAME=Mei
+JOB_BOARD=Indeed
+REGISTRATION_EMAIL=lmei53854@gmail.com
+REGISTRATION_PASSWORD=SecurePassword@123
+REGISTRATION_PHONE=650-450-8692
+
+# Personal Information from CV
+FULL_NAME=Lin Mei
+LOCATION=California, USA
+COUNTRY = United States Of America
+GITHUB_URL=https://github.com/navinAdhe
+CURRENT_POSITION=Software Engineer
+YEARS_EXPERIENCE=7+
+
+# Education
+EDUCATION_MASTERS=Master of Science in Computer Science - University of California, Davis, California, USA
+EDUCATION_BACHELORS=Bachelor of Engineering in Computer Science - University of Pune, Maharashtra, India
+
+# Current Employment
+CURRENT_COMPANY=OSIsoft LLC, San Francisco Bay Area - USA
+CURRENT_ROLE=Sr. Software Developer
+EMPLOYMENT_PERIOD=Aug 2023 - Present
+
+# Previous Employment
+PREVIOUS_COMPANY=Cybage Software, Pune - India
+PREVIOUS_ROLE=Software Engineer
+PREVIOUS_PERIOD=Feb 2016 - Jun 2017
+
+# Skills Summary
+PRIMARY_SKILLS=C#, TypeScript, Java, JavaScript, SQL, HTML5, CSS3, Python
+FRAMEWORKS=.NET Core, Angular 2+, RxJS, Entity Framework, React, Redux, Bootstrap 4
+CLOUD_PLATFORMS=Microsoft Azure, Azure Functions, App Services, Blob Storage
+DATABASES=SQL Server, Stored Procedures, Triggers, Functions
+TESTING_FRAMEWORKS=Jasmine, Karma, Cypress, Appium, Selenium
+>>>>>>> 4cbfa38f73e545223e2a3c564ee64bb194965d8e
 DISABILITY_STATUS=I do not wish to answer
 ```
 
@@ -115,11 +160,19 @@ python direct_form_filler.py
 ```
 workday-automation/
 ├── .gitignore
+<<<<<<< HEAD
 ├── main.py                    # Main automation flow
 ├── direct_form_filler.py      # Direct form filling logic
 ├── config_manager.py          # Configuration management
 ├── resume_fill.py             # Resume handling logic
 ├── performance_monitor.py     # Performance monitoring
+=======
+├── main.py                     # Main automation flow
+├── direct_form_filler.py       # Direct form filling logic
+├── config_manager.py       
+├── resume_fill.py
+├── performance_monitor.py       
+>>>>>>> 4cbfa38f73e545223e2a3c564ee64bb194965d8e
 ├── .env                       # Environment variables (create this)
 ├── workday_forms_complete.json # Extracted form data
 ├── README.md                  # This file
