@@ -116,7 +116,7 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
             'currentCompany': os.getenv('CURRENT_COMPANY', ''),
             'currentRole': os.getenv('CURRENT_ROLE', ''),
             'skills': os.getenv('PRIMARY_SKILLS', ''),
-            'education': os.getenv('EDUCATION_MASTERS', ''),
+            # 'education': os.getenv('EDUCATION_MASTERS', ''),
             'github': os.getenv('GITHUB_URL', ''),
             'workAuthorization': 'Yes',
             'visaStatus': 'US Citizen',
@@ -148,6 +148,10 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
             'The following questions are to assist Walmart in determining your eligibility for its industry-leading hiring program for service members from any branch of the Uniformed Services of the United States and military spouses.  If you do not wish to answer these questions, please indicate below, and you can skip this portion of the application process.  If you provide the information on military status, it will not be considered in determining your qualification for any particular position.  Veterans and military spouses may be required to provide proof of their status, such as a DD 214 or Department of Defense Dependent Identification Card, to determine eligibility for this special hiring initiative.  *Uniformed Services are defined as the Army, Navy, Air Force, Marine Corps, Coast Guard, Public Health Service (Commissioned Corps) and the National Oceanic and Atmospheric Administration.  Do you have Active Duty or Guard/Reserve experience in the Uniformed Services of the United States?': os.getenv('ACTIVE_DUTY_STATUS', 'No'),
             
             "Do you have a direct family member who currently works for Walmart or Sam's Club?": os.getenv('FAMILY_MEMBER_WORKS_AT_WALMART', 'No'),
+            
+            'Does the Legal Name you provided on the “My Information” page match the name on your legal ID?': os.getenv('NAME_LEGAL', 'Yes'),
+            
+            
 
         }
     
@@ -700,15 +704,29 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
         print(f"    🔍 Looking for question: '{question_text[:50]}...'")
         
         try:
-            # First locate the question text
-            escaped_text = question_text.replace('"', '\\"').replace("'", "\\'")
+            # First locate the question text, cleaning up any HTML-like formatting
+            # Remove HTML tags but keep their text content for matching
+            cleaned_text = re.sub(r'<[^>]+>', '', question_text)
+            # Normalize whitespace
+            cleaned_text = ' '.join(cleaned_text.split())
+            escaped_text = cleaned_text.replace('"', '\\"').replace("'", "\\'")
+            
+            # Create flexible selectors that can match text across multiple elements
             selectors = [
+                # Exact text match selectors
                 f"text='{escaped_text}'",
                 f'text="{escaped_text}"',
+                
+                # Flexible container selectors that might contain formatted text
                 f"div:has-text('{escaped_text}')",
                 f'label:has-text("{escaped_text}")',
                 f'span:has-text("{escaped_text}")',
-                f'p:has-text("{escaped_text}")'
+                f'p:has-text("{escaped_text}")',
+                
+                # Additional selectors for complex formatting
+                '*[role="heading"]:has-text("{escaped_text}")',  # For section headers
+                '*[class*="question"]:has-text("{escaped_text}")',  # Common question class pattern
+                '*:has(> a):has-text("{escaped_text}")'  # Container with links
             ]
             
             question_element = None
@@ -717,8 +735,20 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
                     elements = await page.query_selector_all(selector)
                     for element in elements:
                         if await element.is_visible():
+                            # Get both inner_text and textContent to handle different text representations
                             element_text = await element.inner_text()
-                            if question_text.lower() in element_text.lower():
+                            text_content = await element.evaluate('el => el.textContent')
+                            
+                            # Clean up both texts
+                            element_text = ' '.join(element_text.split()).lower()
+                            text_content = ' '.join(text_content.split()).lower()
+                            cleaned_question = ' '.join(cleaned_text.split()).lower()
+                            
+                            # Check if any version of the text matches
+                            if (cleaned_question in element_text or 
+                                cleaned_question in text_content or
+                                self._fuzzy_match(cleaned_question, element_text) or
+                                self._fuzzy_match(cleaned_question, text_content)):
                                 question_element = element
                                 print(f"        ✅ Found question element with text: '{element_text[:50]}...'")
                                 break
