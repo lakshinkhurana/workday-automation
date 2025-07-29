@@ -42,19 +42,12 @@ An automated form filling system for Workday job applications that streamlines t
 Create a `.env` file in the project root with your personal information:
 
 ```env
-<<<<<<< HEAD
 # Workday Configuration
-=======
->>>>>>> 4cbfa38f73e545223e2a3c564ee64bb194965d8e
 WORKDAY_TENANT_URL=https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite
 WORKDAY_USERNAME=dummy128mailneeded@gmail.com
 WORKDAY_PASSWORD=SecurePassword@123
 JOB_URL=https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-CA%2C-Santa-Clara/Senior-Systems-Engineer--DriveAV---Autonomous-Vehicles_JR2000493/apply/applyManually?locationHierarchy1=2fcb99c455831013ea52fb338f2932d8
-<<<<<<< HEAD
 RESUME_PATH=C:/Users/YourName/Downloads/your_resume.pdf
-=======
-RESUME_PATH=Lin Mei_Experiened Level Software.pdf
->>>>>>> 4cbfa38f73e545223e2a3c564ee64bb194965d8e
 WORKDAY_END_URL=https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/jobTasks/completed/application
 
 # Registration Configuration
@@ -66,42 +59,20 @@ JOB_BOARD=Indeed
 REGISTRATION_EMAIL=your_email@gmail.com
 REGISTRATION_PASSWORD=SecurePassword@123
 REGISTRATION_PHONE=123-456-7890
+WORKDAY_TENANT_URL=https://walmart.wd5.myworkdayjobs.com/en-US/WalmartExternal
+WORKDAY_USERNAME=dummy7mailneeded@gmail.com
+WORKDAY_PASSWORD=SecurePassword@123
+JOB_URL=https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US%2C-CA%2C-Santa-Clara/Senior-Systems-Engineer--DriveAV---Autonomous-Vehicles_JR2000493/apply/applyManually?locationHierarchy1=2fcb99c455831013ea52fb338f2932d8
+RESUME_PATH=Lin Mei_Experiened Level Software.pdf
+WORKDAY_END_URL=https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/jobTasks/completed/application
 
-# Personal Information
-FULL_NAME=Your Full Name
-LOCATION=Your City, State
-COUNTRY=United States Of America
-GITHUB_URL=https://github.com/yourusername
-CURRENT_POSITION=Your Current Position
-YEARS_EXPERIENCE=5+
-
-# Education
-EDUCATION_MASTERS=Master of Science in Computer Science - University Name, City, State
-EDUCATION_BACHELORS=Bachelor of Engineering in Computer Science - University Name, City, State
-
-# Current Employment
-CURRENT_COMPANY=Your Current Company
-CURRENT_ROLE=Your Current Role
-EMPLOYMENT_PERIOD=Jan 2020 - Present
-
-# Previous Employment
-PREVIOUS_COMPANY=Your Previous Company
-PREVIOUS_ROLE=Your Previous Role
-PREVIOUS_PERIOD=Jan 2018 - Dec 2019
-
-# Skills Summary
-PRIMARY_SKILLS=Python, JavaScript, Java, SQL, HTML5, CSS3
-FRAMEWORKS=Django, React, Node.js, Express
-CLOUD_PLATFORMS=AWS, Azure, Google Cloud
-DATABASES=PostgreSQL, MySQL, MongoDB
-TESTING_FRAMEWORKS=Jest, Pytest, Selenium
-
-# Personal Preferences
-=======
+# Registration Configuration
+CREATE_ACCOUNT_MODE=true
+AGE=25
 REGISTRATION_FIRST_NAME=Lin
 REGISTRATION_LAST_NAME=Mei
 JOB_BOARD=Indeed
-REGISTRATION_EMAIL=lmei53854@gmail.com
+REGISTRATION_EMAIL=''
 REGISTRATION_PASSWORD=SecurePassword@123
 REGISTRATION_PHONE=650-450-8692
 
@@ -112,6 +83,11 @@ COUNTRY = United States Of America
 GITHUB_URL=https://github.com/navinAdhe
 CURRENT_POSITION=Software Engineer
 YEARS_EXPERIENCE=7+
+ADDRESS=1234 Elm Street, San Francisco, CA 94101, USA
+CITY=San Francisco
+STATE=California
+POSTAL_CODE=90210
+
 
 # Education
 EDUCATION_MASTERS=Master of Science in Computer Science - University of California, Davis, California, USA
@@ -133,8 +109,16 @@ FRAMEWORKS=.NET Core, Angular 2+, RxJS, Entity Framework, React, Redux, Bootstra
 CLOUD_PLATFORMS=Microsoft Azure, Azure Functions, App Services, Blob Storage
 DATABASES=SQL Server, Stored Procedures, Triggers, Functions
 TESTING_FRAMEWORKS=Jasmine, Karma, Cypress, Appium, Selenium
->>>>>>> 4cbfa38f73e545223e2a3c564ee64bb194965d8e
 DISABILITY_STATUS=I do not wish to answer
+
+#Walmart
+WALMART_AFFILATION=Have never been an employee of Walmart Inc or any of its subsidiaries
+WALMART_WORK_ELLIGIBILITY=Yes
+WALMART_MESSAGES=Opt-Out from receiving text messages from Walmart
+WALMART_QUALIFICATIONS=Yes
+REQUIRE_SPONSORSHIP=No
+ACTIVE_DUTY=No
+FAMILY_MEMBER_WORKS_AT_WALMART=No
 ```
 
 **Important**: Update the `WORKDAY_TENANT_URL` with the specific company's Workday careers page URL.
