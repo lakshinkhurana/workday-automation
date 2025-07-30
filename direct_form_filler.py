@@ -2,14 +2,16 @@
 """
 Direct Form Filler - Enhanced with button-based dropdown support
 """
-
-
-import os
 import sys
+import os
 import asyncio
 from turtle import delay
 from dotenv import load_dotenv
 import datetime
+from datetime import datetime
+from functools import lru_cache
+import re
+from typing import Dict, List, Optional
 
 load_dotenv()
 
@@ -27,7 +29,7 @@ class AutomationCompleteException(Exception):
         print(f"✨ Status: {'Success' if self.success else 'Failed'}")
         print(f"✨ Message: {self.message}")
         print("✨ Application process has been completed")
-        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"✨ Completed at: {current_time}")
         print("="*80 + "\n")
         if self.success:
@@ -36,13 +38,6 @@ class AutomationCompleteException(Exception):
             sys.exit(1)  # Exit with error code
 
 
-# Cache common imports
-from functools import lru_cache
-import re
-import os
-import asyncio
-import datetime
-from typing import Dict, List, Optional
 
 class DirectFormFiller:
     """Direct form filling by id, data-automation-id, and name attributes with button dropdown support"""
@@ -67,7 +62,6 @@ class DirectFormFiller:
         
         
         # Set up today's date for form filling
-        from datetime import datetime
         today = datetime.now()
         today_month = str(today.month)
         today_day = str(today.day)
@@ -166,7 +160,7 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
           await self._debug_page_fields(page)
       except AutomationCompleteException as e:
           print("\n" + "="*80)
-          print("� Automation Completed Successfully! 🎉")
+          print(" Automation Completed Successfully! 🎉")
           print("✨ All required forms have been filled")
           print("✨ Application process is complete")
           print("="*80 + "\n")
@@ -220,17 +214,23 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
             print("  ⚠️ Failed to handle Self Identify page")
         return self.filled_count
     
-    # Continue with regular field filling for other pages
+      # Continue with regular field filling for other pages
       for field_id, value in self.field_mappings.items():
         if value and field_id not in already_filled:
-            success = await self._fill_field_by_id(page, field_id, value)
-            if success:
-                self.filled_count += 1
-                print(f"    ✅ {field_id}: {value}")
+            # Heuristic: if it has spaces, a '?', or is long, it's a question.
+            is_question = ' ' in field_id or '?' in field_id or len(field_id) > 50
+            
+            if is_question:
+                success = await self._handle_question_dropdown(page, field_id, value)
+                if not success:
+                    success = await self.fill_by_question_text(page, field_id, value)
             else:
-                print(f"    ⚠️ Not found: {field_id}")
+                success = await self._fill_field_by_id(page, field_id, value)
+
+            if not success:
+                print(f"    ⚠️ Not found: {field_id[:50]}...")
         elif field_id in already_filled:
-            print(f"    ↷ Skipping already filled field: {field_id}")
+            pass
     
       print(f"  ✅ Direct filling complete: {self.filled_count} fields filled")
       return self.filled_count
@@ -316,74 +316,65 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
     async def _fill_field_by_id(self, page, field_id: str, value: str) -> bool:
         """Fill a specific field by its id, data-automation-id, or name attributes"""
         
-        print(f"    🔍 Attempting to fill field '{field_id}' with value '{value}'")
-        
-        # Check for existing value before filling
         try:
-            # Check input fields
-            input_selectors = [
-                f'input[id="{field_id}"]',
-                f'input[data-automation-id="{field_id}"]',
-                f'input[name="{field_id}"]'
-            ]
-            for selector in input_selectors:
-                element = await page.query_selector(selector)
-                if element and await element.is_visible():
-                    current_value = await element.input_value()
-                    if current_value.strip() == value.strip():
-                        print(f"    ✅ Field '{field_id}' already has correct value: '{value}'")
-                        return True
+            # Check for existing value before filling
+            try:
+                # Check input fields
+                input_selectors = [
+                    f'input[id="{field_id}"]',
+                    f'input[data-automation-id="{field_id}"]',
+                    f'input[name="{field_id}"]'
+                ]
+                for selector in input_selectors:
+                    element = await page.query_selector(selector)
+                    if element and await element.is_visible():
+                        current_value = await element.input_value()
+                        if current_value.strip() == value.strip():
+                            return True
+                
+                # Check button dropdowns
+                button_selectors = [
+                    f'button[id="{field_id}"]',
+                    f'button[data-automation-id="{field_id}"]'
+                ]
+                for selector in button_selectors:
+                    element = await page.query_selector(selector)
+                    if element and await element.is_visible():
+                        button_text = await element.inner_text()
+                        if button_text.strip().lower() == value.strip().lower():
+                            return True
+                
+                # Check select elements
+                select_selectors = [
+                    f'select[id="{field_id}"]',
+                    f'select[data-automation-id="{field_id}"]'
+                ]
+                for selector in select_selectors:
+                    element = await page.query_selector(selector)
+                    if element and await element.is_visible():
+                        selected_option = await element.evaluate('el => el.options[el.selectedIndex].text')
+                        if selected_option and selected_option.strip().lower() == value.strip().lower():
+                            return True
+            except Exception:
+                pass
             
-            # Check button dropdowns
-            button_selectors = [
-                f'button[id="{field_id}"]',
-                f'button[data-automation-id="{field_id}"]'
-            ]
-            for selector in button_selectors:
-                element = await page.query_selector(selector)
-                if element and await element.is_visible():
-                    button_text = await element.inner_text()
-                    if button_text.strip().lower() == value.strip().lower():
-                        print(f"    ✅ Button '{field_id}' already has correct value: '{value}'")
-                        return True
+            # If no matching value found, proceed with filling
             
-            # Check select elements
-            select_selectors = [
-                f'select[id="{field_id}"]',
-                f'select[data-automation-id="{field_id}"]'
-            ]
-            for selector in select_selectors:
-                element = await page.query_selector(selector)
-                if element and await element.is_visible():
-                    selected_option = await element.evaluate('el => el.options[el.selectedIndex].text')
-                    if selected_option and selected_option.strip().lower() == value.strip().lower():
-                        print(f"    ✅ Select '{field_id}' already has correct value: '{value}'")
-                        return True
-        except Exception as e:
-            print(f"    ⚠️ Error checking existing value: {str(e)}")
-        
-        # If no matching value found, proceed with filling
-        
-        # Check if this is a button dropdown first (highest priority)
-        button_dropdown_success = await self._handle_button_dropdown_by_id(page, field_id, value)
-        if button_dropdown_success:
-            return True
-        
-        # Special handling for known dropdown fields
-        if field_id == 'source--source':
-            return await self._handle_source_dropdown_simple(page, field_id, value)
-        
-        if field_id == 'phoneNumber--phoneDeviceType':
-            return await self._handle_phone_device_type_dropdown(page, field_id, value)
-        
-        # # Special handling for date fields
-        # if any(date_field in field_id for date_field in ['selfIdentifiedDisabilityData--dateSignedOn-dateSectionMonth-input', 'selfIdentifiedDisabilityData--dateSignedOn-dateSectionDay-input', 'selfIdentifiedDisabilityData--dateSignedOn-dateSectionYear-input']):
-        #     return await self._handle_date_simple_fill(page, field_id, value)
+            # Check if this is a button dropdown first (highest priority)
+            button_dropdown_success = await self._handle_button_dropdown_by_id(page, field_id, value)
+            if button_dropdown_success:
+                return True
+            
+            # Special handling for known dropdown fields
+            if field_id == 'source--source':
+                return await self._handle_source_dropdown_simple(page, field_id, value)
+            
+            if field_id == 'phoneNumber--phoneDeviceType':
+                return await self._handle_phone_device_type_dropdown(page, field_id, value)
+            
+            if field_id == 'termsAndConditions--acceptTermsAndAgreements':
+                return await self._handle_terms_checkbox(page, value)
 
-        if field_id == 'termsAndConditions--acceptTermsAndAgreements':
-            return await self._handle_terms_checkbox(page, value)
-
-        try:
             # Try text input fields
             text_selectors = [
                 f'input[id="{field_id}"]',
@@ -395,14 +386,11 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
             
             for i, selector in enumerate(text_selectors):
                 try:
-                    print(f"      🔍 Trying text selector {i+1}: {selector}")
                     text_element = await page.query_selector(selector)
                     if text_element:
                         is_visible = await text_element.is_visible()
                         is_enabled = await text_element.is_enabled()
                         input_type = await text_element.get_attribute('type')
-                        
-                        print(f"        Found element: visible={is_visible}, enabled={is_enabled}, type={input_type}")
                         
                         if is_visible and is_enabled:
                             if input_type in ['text', 'email', 'tel', None]:
@@ -422,10 +410,9 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
                                 
                                 filled_value = await page.input_value(selector)
                                 if filled_value == value:
-                                    print(f"    ✅ Successfully filled text field using selector: {selector}")
+                                    print(f"    ✅ Successfully filled text field: {field_id}")
+                                    self.filled_count += 1
                                     return True
-                                else:
-                                    print(f"    ⚠️ Value not set correctly. Expected: '{value}', Got: '{filled_value}'")
                             elif input_type == 'radio':
                                 return await self._handle_radio_by_id(page, field_id, value)
                             elif input_type == 'checkbox':
@@ -434,12 +421,10 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
                                     await page.check(selector)
                                 else:
                                     await page.uncheck(selector)
-                                print(f"    ✅ Filled checkbox using selector: {selector}")
+                                print(f"    ✅ Filled checkbox: {field_id}")
+                                self.filled_count += 1
                                 return True
-                        else:
-                            print(f"        Element not interactable: visible={is_visible}, enabled={is_enabled}")
-                except Exception as e:
-                    print(f"        Error with selector {selector}: {str(e)}")
+                except Exception:
                     continue
             
             # Try select dropdown fields
@@ -453,23 +438,18 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
             
             for i, selector in enumerate(select_selectors):
                 try:
-                    print(f"      🔍 Trying select selector {i+1}: {selector}")
                     select_element = await page.query_selector(selector)
                     if select_element:
                         is_visible = await select_element.is_visible()
                         is_enabled = await select_element.is_enabled()
                         
-                        print(f"        Found select element: visible={is_visible}, enabled={is_enabled}")
-                        
                         if is_visible and is_enabled:
                             success = await self._handle_select_by_id(select_element, value)
                             if success:
-                                print(f"    ✅ Successfully filled select field using selector: {selector}")
+                                print(f"    ✅ Successfully filled select field: {field_id}")
+                                self.filled_count += 1
                                 return True
-                        else:
-                            print(f"        Select element not interactable: visible={is_visible}, enabled={is_enabled}")
-                except Exception as e:
-                    print(f"        Error with select selector {selector}: {str(e)}")
+                except Exception:
                     continue
             
             # Try textarea fields
@@ -483,13 +463,10 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
             
             for i, selector in enumerate(textarea_selectors):
                 try:
-                    print(f"      🔍 Trying textarea selector {i+1}: {selector}")
                     textarea_element = await page.query_selector(selector)
                     if textarea_element:
                         is_visible = await textarea_element.is_visible()
                         is_enabled = await textarea_element.is_enabled()
-                        
-                        print(f"        Found textarea element: visible={is_visible}, enabled={is_enabled}")
                         
                         if is_visible and is_enabled:
                             await page.wait_for_selector(selector, state='attached')
@@ -498,37 +475,23 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
                             
                             filled_value = await page.input_value(selector)
                             if filled_value == value:
-                                print(f"    ✅ Successfully filled textarea using selector: {selector}")
+                                print(f"    ✅ Successfully filled textarea: {field_id}")
+                                self.filled_count += 1
                                 return True
-                            else:
-                                print(f"    ⚠️ Textarea value not set correctly. Expected: '{value}', Got: '{filled_value}'")
-                        else:
-                            print(f"        Textarea element not interactable: visible={is_visible}, enabled={is_enabled}")
-                except Exception as e:
-                    print(f"        Error with textarea selector {selector}: {str(e)}")
+                except Exception:
                     continue
             
             # Radio button groups
             if field_id in ['candidateIsPreviousWorker', 'workAuthorization', 'requiresSponsorship']:
-                print(f"      🔍 Handling radio button group for: {field_id}")
                 return await self._handle_radio_by_id(page, field_id, value)
             
-            # Try fill by question text as a last resort if the field_id looks like a question
-            if '?' in field_id or len(field_id) > 20:
-                print(f"      🔍 Trying fill by question text for: {field_id}")
-                return await self.fill_by_question_text(page, field_id, value)
-            
-            print(f"    ❌ No matching element found for field: {field_id}")
             return False
             
-        except Exception as e:
-            print(f"    ❌ Critical error filling {field_id}: {str(e)}")
+        except Exception:
             return False
     
     async def _handle_button_dropdown_by_id(self, page, field_id: str, value: str) -> bool:
         """Handle button-based dropdowns with aria-haspopup='listbox' structure"""
-        
-        print(f"      🔍 Checking for button dropdown: {field_id}")
         
         try:
             # Try different selectors for button dropdowns
@@ -543,58 +506,38 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
             
             for selector in button_selectors:
                 try:
-                    print(f"        🔍 Trying button selector: {selector}")
                     button_element = await page.query_selector(selector)
                     
                     if button_element and await button_element.is_visible():
-                        # Check if it's a dropdown button
                         aria_haspopup = await button_element.get_attribute('aria-haspopup')
-                        button_type = await button_element.get_attribute('type')
                         button_text = await button_element.inner_text()
                         
-                        print(f"        Found button: aria-haspopup='{aria_haspopup}', type='{button_type}', text='{button_text}'")
-                        
-                        # Check if it's a listbox dropdown button
                         if aria_haspopup == 'listbox' or 'Select' in button_text or button_text.strip() == '':
-                            print(f"        ✅ Found button dropdown with selector: {selector}")
-                            
-                            # Click the button to open dropdown
                             await button_element.click()
-                            await asyncio.sleep(1)  # Wait for dropdown to open
-                            print(f"        🖱️ Clicked button dropdown")
+                            await asyncio.sleep(1)
                             
-                            # Look for dropdown options
                             success = await self._select_dropdown_option_from_listbox(page, value, field_id)
                             
                             if success:
                                 print(f"    ✅ Successfully selected '{value}' from button dropdown '{field_id}'")
+                                self.filled_count += 1
                                 return True
                             else:
-                                print(f"    ⚠️ Could not select '{value}' from button dropdown options")
-                                
-                                # Try pressing Escape to close dropdown if selection failed
                                 try:
                                     await page.keyboard.press('Escape')
                                     await asyncio.sleep(0.5)
                                 except:
                                     pass
-                        else:
-                            print(f"        Not a dropdown button (aria-haspopup='{aria_haspopup}')")
-                            
-                except Exception as e:
-                    print(f"        Error with button selector {selector}: {str(e)}")
+                except Exception:
                     continue
             
             return False
             
-        except Exception as e:
-            print(f"        ❌ Error handling button dropdown {field_id}: {str(e)}")
+        except Exception:
             return False
     
     async def _select_dropdown_option_from_listbox(self, page, value: str, field_id: str) -> bool:
         """Select option from opened listbox dropdown"""
-        
-        print(f"        🔍 Looking for dropdown options with value '{value}'")
         
         try:
             # Wait for dropdown options to appear
@@ -616,11 +559,8 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
             # First try exact matches
             for option_selector in option_selectors:
                 try:
-                    print(f"          🔍 Trying exact option selector: {option_selector}")
                     option_element = await page.wait_for_selector(option_selector, timeout=3000, state='visible')
                     if option_element:
-                        option_text = await option_element.inner_text()
-                        print(f"          ✅ Found exact match option: '{option_text}'")
                         await option_element.click()
                         await asyncio.sleep(0.5)
                         return True
@@ -628,9 +568,6 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
                     continue
             
             # If exact match not found, try partial matching
-            print(f"        🔍 Trying partial text matching for '{value}'...")
-            
-            # Look for any visible dropdown options
             potential_option_selectors = [
                 '[role="option"]',
                 '[role="listbox"] li',
@@ -643,7 +580,6 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
             for potential_selector in potential_option_selectors:
                 try:
                     options = await page.query_selector_all(f'{potential_selector}:visible')
-                    print(f"          🔍 Found {len(options)} potential options with selector: {potential_selector}")
                     
                     for i, option in enumerate(options[:10]):  # Limit to first 10 options
                         try:
@@ -651,45 +587,95 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
                             option_text_clean = option_text.strip().lower()
                             value_clean = value.strip().lower()
                             
-                            print(f"            Option {i+1}: '{option_text}'")
-                            
-                            # Check for partial matches
                             if (value_clean in option_text_clean or 
                                 option_text_clean in value_clean or
                                 self._fuzzy_match(value_clean, option_text_clean)):
                                 
-                                print(f"          ✅ Found partial match: '{option_text}' matches '{value}'")
                                 await option.click()
                                 await asyncio.sleep(0.5)
                                 return True
                                 
-                        except Exception as e:
-                            print(f"            Error checking option {i+1}: {str(e)}")
+                        except Exception:
                             continue
                             
-                except Exception as e:
-                    print(f"          Error with potential selector {potential_selector}: {str(e)}")
+                except Exception:
                     continue
             
             # Final fallback: try typing the value and pressing Enter
-            print(f"        🔍 Fallback: trying to type '{value}' and press Enter")
             try:
                 await page.keyboard.type(value, delay=1000)
                 await asyncio.sleep(0.5)
                 await page.keyboard.press('Enter')
                 await asyncio.sleep(0.5)
-                print(f"        ✅ Typed '{value}' and pressed Enter")
                 return True
-            except Exception as e:
-                print(f"        ❌ Typing fallback failed: {str(e)}")
+            except Exception:
+                pass
             
             return False
             
-        except Exception as e:
-            print(f"        ❌ Error selecting dropdown option: {str(e)}")
+        except Exception:
             return False
     
-    async def fill_by_question_text(self, page, question_text: str, answer_value: str) -> bool:
+    async def _handle_question_dropdown(self, page, question_text: str, answer_value: str) -> bool:
+        """Handle dropdowns associated with a question"""
+        try:
+            # Find the question element
+            question_element = None
+            cleaned_text = re.sub(r'<[^>]+>', '', question_text)
+            cleaned_text = ' '.join(cleaned_text.split()).lower()
+            all_elements = await page.query_selector_all('body *')
+            for element in all_elements:
+                try:
+                    if not await element.is_visible():
+                        continue
+                    element_text = await element.evaluate('el => el.textContent')
+                    element_text = ' '.join(element_text.split()).lower()
+                    if cleaned_text in element_text:
+                        question_element = element
+                        break
+                except Exception:
+                    continue
+
+            if not question_element:
+                return False
+
+            # Find the dropdown
+            question_box = await question_element.bounding_box()
+            if not question_box:
+                return False
+
+            dropdown_selector = 'button[aria-haspopup="listbox"]'
+            dropdowns = await page.query_selector_all(dropdown_selector)
+            closest_dropdown = None
+            min_distance = float('inf')
+
+            for dropdown in dropdowns:
+                if await dropdown.is_visible():
+                    dropdown_box = await dropdown.bounding_box()
+                    if dropdown_box:
+                        vertical_distance = dropdown_box['y'] - (question_box['y'] + question_box['height'])
+                        if 0 < vertical_distance < min_distance:
+                            min_distance = vertical_distance
+                            closest_dropdown = dropdown
+
+            if not closest_dropdown:
+                return False
+
+            # Open the dropdown and select the option
+            await closest_dropdown.click()
+            await asyncio.sleep(1)
+
+            success = await self._select_dropdown_option_from_listbox(page, answer_value, "question-dropdown")
+            if success:
+                print(f"    ✅ Successfully answered question: {question_text[:50]}...")
+                self.filled_count += 1
+            
+            return success
+
+        except Exception:
+            return False
+
+    async def fill_by_question_text(self, page, question_text: str, answer_value: str, strict: bool = True) -> bool:
         """
         Find a button below specific question text and fill it with the given answer.
         
@@ -697,74 +683,70 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
             page: The page object
             question_text: The text of the question to look for
             answer_value: The value to select/enter in the associated button/input
+            strict: If True, performs a more precise search for the question text.
             
         Returns:
             bool: True if successfully filled, False otherwise
         """
-        print(f"    🔍 Looking for question: '{question_text[:50]}...'")
-        
         try:
             # First locate the question text, cleaning up any HTML-like formatting
-            # Remove HTML tags but keep their text content for matching
             cleaned_text = re.sub(r'<[^>]+>', '', question_text)
-            # Normalize whitespace
-            cleaned_text = ' '.join(cleaned_text.split())
-            escaped_text = cleaned_text.replace('"', '\\"').replace("'", "\\'")
-            
-            # Create flexible selectors that can match text across multiple elements
-            selectors = [
-                # Exact text match selectors
-                f"text='{escaped_text}'",
-                f'text="{escaped_text}"',
-                
-                # Flexible container selectors that might contain formatted text
-                f"div:has-text('{escaped_text}')",
-                f'label:has-text("{escaped_text}")',
-                f'span:has-text("{escaped_text}")',
-                f'p:has-text("{escaped_text}")',
-                
-                # Additional selectors for complex formatting
-                '*[role="heading"]:has-text("{escaped_text}")',  # For section headers
-                '*[class*="question"]:has-text("{escaped_text}")',  # Common question class pattern
-                '*:has(> a):has-text("{escaped_text}")'  # Container with links
-            ]
+            cleaned_text = ' '.join(cleaned_text.split()).lower()
             
             question_element = None
-            for selector in selectors:
-                try:
-                    elements = await page.query_selector_all(selector)
-                    for element in elements:
-                        if await element.is_visible():
-                            # Get both inner_text and textContent to handle different text representations
-                            element_text = await element.inner_text()
-                            text_content = await element.evaluate('el => el.textContent')
-                            
-                            # Clean up both texts
-                            element_text = ' '.join(element_text.split()).lower()
-                            text_content = ' '.join(text_content.split()).lower()
-                            cleaned_question = ' '.join(cleaned_text.split()).lower()
-                            
-                            # Check if any version of the text matches
-                            if (cleaned_question in element_text or 
-                                cleaned_question in text_content or
-                                self._fuzzy_match(cleaned_question, element_text) or
-                                self._fuzzy_match(cleaned_question, text_content)):
-                                question_element = element
-                                print(f"        ✅ Found question element with text: '{element_text[:50]}...'")
-                                break
-                    if question_element:
-                        break
-                except Exception as e:
-                    continue
+
+            if strict:
+                # Strict search: Find an element with text that closely matches the question
+                all_elements = await page.query_selector_all('body *')
+                for element in all_elements:
+                    try:
+                        if not await element.is_visible():
+                            continue
+                        element_text = await element.evaluate('el => el.textContent')
+                        element_text = ' '.join(element_text.split()).lower()
+                        if cleaned_text == element_text:
+                            question_element = element
+                            break
+                    except Exception:
+                        continue
+
+            if not question_element:
+                # Fallback to the original, more flexible search method
+                escaped_text = cleaned_text.replace('"', '\"').replace("'", "\'")
+                selectors = [
+                    f"text='{escaped_text}'",
+                    f'text="{escaped_text}"',
+                    f"div:has-text('{escaped_text}')",
+                    f'label:has-text("{escaped_text}")',
+                    f'span:has-text("{escaped_text}")',
+                    f'p:has-text("{escaped_text}")',
+                    '*[role="heading"]:has-text("{escaped_text}")',
+                    '*[class*="question"]:has-text("{escaped_text}")',
+                    '*:has(> a):has-text("{escaped_text}")'
+                ]
+                for selector in selectors:
+                    try:
+                        elements = await page.query_selector_all(selector)
+                        for element in elements:
+                            if await element.is_visible():
+                                element_text = await element.inner_text()
+                                text_content = await element.evaluate('el => el.textContent')
+                                element_text = ' '.join(element_text.split()).lower()
+                                text_content = ' '.join(text_content.split()).lower()
+                                if (cleaned_text in element_text or cleaned_text in text_content or self._fuzzy_match(cleaned_text, element_text) or self._fuzzy_match(cleaned_text, text_content)):
+                                    question_element = element
+                                    break
+                        if question_element:
+                            break
+                    except Exception:
+                        continue
             
             if not question_element:
-                print(f"        ❌ Could not find question text: {question_text[:50]}...")
                 return False
                 
             # Get the bounding box of the question element
             question_box = await question_element.bounding_box()
             if not question_box:
-                print("        ❌ Could not get question element position")
                 return False
                 
             # Look for the nearest button/input below the question
@@ -786,18 +768,15 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
                         if element_box:
                             # Check if the element is below the question
                             vertical_distance = element_box['y'] - (question_box['y'] + question_box['height'])
-                            horizontal_overlap = (
-                                element_box['x'] < (question_box['x'] + question_box['width']) and
-                                (element_box['x'] + element_box['width']) > question_box['x']
-                            )
+                            horizontal_overlap = (element_box['x'] < (question_box['x'] + question_box['width']) and (element_box['x'] + element_box['width']) > question_box['x'])
                             
-                            if vertical_distance > 0 and vertical_distance < min_distance and horizontal_overlap:
-                                min_distance = vertical_distance
-                                closest_element = element
-                                print(f"        ✅ Found potential input element {vertical_distance}px below question")
+                            if vertical_distance > 0 and vertical_distance < 300 and horizontal_overlap:
+                                distance = vertical_distance
+                                if distance < min_distance:
+                                    min_distance = distance
+                                    closest_element = element
             
             if not closest_element:
-                print("        ❌ Could not find any input element below the question")
                 return False
                 
             # Handle the found element based on its type
@@ -808,23 +787,29 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
                 await closest_element.click()
                 await asyncio.sleep(0.5)
                 success = await self._select_dropdown_option_from_listbox(page, answer_value, "dynamic-button")
+                if success:
+                    print(f"    ✅ Successfully answered question: {question_text[:50]}...")
+                    self.filled_count += 1
                 return success
                 
             elif tag_name == 'input':
                 # If it's an input, type the value
                 await closest_element.click()
                 await closest_element.fill(answer_value)
+                print(f"    ✅ Successfully answered question: {question_text[:50]}...")
+                self.filled_count += 1
                 return True
                 
             elif tag_name == 'select':
                 # If it's a select, use select_option
                 await closest_element.select_option(label=answer_value)
+                print(f"    ✅ Successfully answered question: {question_text[:50]}...")
+                self.filled_count += 1
                 return True
                 
             return False
             
-        except Exception as e:
-            print(f"        ❌ Error in fill_by_question_text: {str(e)}")
+        except Exception:
             return False
 
     @lru_cache(maxsize=1024)
@@ -835,9 +820,8 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
         stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'not', 'select', 'one', 'choose', 'please'}
         
         def clean_text(text):
-            import re
             # Remove punctuation and convert to lowercase
-            text = re.sub(r'[^\w\s]', '', text.lower())
+            text = re.sub(r'[^",a-z0-9 ]', '', text.lower())
             # Split into words and remove stop words
             words = [word for word in text.split() if word not in stop_words and len(word) > 1]
             return set(words)
@@ -890,13 +874,11 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
     async def _handle_phone_device_type_dropdown(self, page, field_id: str, value: str) -> bool:
         """Handle phone device type dropdown with button-based listbox structure"""
         
-        print(f"      🔍 Handling phone device type dropdown for: {field_id}")
-        
         try:
             button_selectors = [
                 f'button[id="{field_id}"]',
                 f'button[id="phoneNumber--phoneType"]',
-                f'button[name="phoneType"]',
+                f'button[name="phone_Type"]',
                 f'button[aria-haspopup="listbox"]',
                 f'button[id*="phoneType"]',
                 f'button[id*="phoneNumber--phoneType"]'
@@ -904,44 +886,34 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
             
             for selector in button_selectors:
                 try:
-                    print(f"        🔍 Trying phone device type button selector: {selector}")
                     button_element = await page.query_selector(selector)
                     if button_element and await button_element.is_visible():
-                        print(f"        ✅ Found phone device type button with selector: {selector}")
                         
                         await page.click(selector)
                         await asyncio.sleep(1)
-                        print(f"        🖱️ Clicked phone device type button")
                         
                         success = await self._select_dropdown_option_from_listbox(page, value, field_id)
                         if success:
                             return True
                         
-                except Exception as e:
-                    print(f"        Error with phone device type button selector {selector}: {str(e)}")
+                except Exception:
                     continue
             
-            print(f"    ❌ Could not find phone device type dropdown button: {field_id}")
             return False
             
-        except Exception as e:
-            print(f"    ❌ Critical error handling phone device type dropdown {field_id}: {str(e)}")
+        except Exception:
             return False
     
     async def _handle_source_dropdown_simple(self, page, field_id: str, value: str) -> bool:
         """Handle source--source dropdown field - click once, type, and press Enter"""
         
-        print(f"      🔍 Handling source dropdown for: {field_id}")
-        
         try:
             selector = f'input[id="{field_id}"]'
             
-            print(f"        🔍 Trying source dropdown selector: {selector}")
             element = await page.query_selector(selector)
             
             if element and await element.is_visible():
                 is_enabled = await element.is_enabled()
-                print(f"        ✅ Found source element: enabled={is_enabled}")
                 
                 if is_enabled:
                     await page.click(selector)
@@ -953,24 +925,15 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
                     await page.keyboard.press('Enter')
                     await asyncio.sleep(0.5)
                     
-                    print(f"    ✅ Successfully filled source dropdown '{field_id}' with click, type, and Enter")
                     return True
-                else:
-                    print(f"        Source element not enabled")
-            else:
-                print(f"        Source element not found or not visible")
             
-            print(f"    ❌ Could not find or fill source dropdown field: {field_id}")
             return False
             
-        except Exception as e:
-            print(f"    ❌ Critical error handling source dropdown {field_id}: {str(e)}")
+        except Exception:
             return False
 
     async def _handle_date_simple_fill(self, page, field_id: str, value: str) -> bool:
         """Handle date fields using simple fill method"""
-        
-        print(f"      🔍 Handling date field with simple fill for: {field_id}")
         
         try:
             selectors = [
@@ -983,45 +946,31 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
             
             for selector in selectors:
                 try:
-                    print(f"        🔍 Trying date selector: {selector}")
                     element = await page.query_selector(selector)
                     if element and await element.is_visible():
                         is_enabled = await element.is_enabled()
                         
-                        print(f"        ✅ Found date element: enabled={is_enabled}")
-                        
-                        if is_enabled:
-                            # Clear any existing value
+                        if element.is_visible() and is_enabled:
                             await asyncio.sleep(0.3)
                             await page.fill(selector, value)
                             await asyncio.sleep(0.3)
                             
                             filled_value = await page.input_value(selector)
                             if filled_value == value:
-                                print(f"    ✅ Successfully filled date field '{field_id}' with '{value}'")
                                 return True
-                            else:
-                                print(f"    ⚠️ Date value not set correctly. Expected: '{value}', Got: '{filled_value}'")
-                        else:
-                            print(f"        Date element not enabled: {selector}")
                         
-                except Exception as e:
-                    print(f"        Error with date selector {selector}: {str(e)}")
+                except Exception:
                     continue
             
-            print(f"    ❌ Could not find or fill date field: {field_id}")
             return False
             
-        except Exception as e:
-            print(f"    ❌ Critical error handling date field {field_id}: {str(e)}")
+        except Exception:
             return False
 
     async def _handle_radio_by_id(self, page, field_id: str, value: str) -> bool:
         """Handle radio buttons by finding the correct option"""
         
         try:
-            print(f"        🔍 Looking for radio buttons for field: {field_id}")
-            
             radio_selectors = [
                 f'input[name="{field_id}"]',
                 f'input[id="{field_id}"]',
@@ -1029,19 +978,9 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
             ]
             
             for selector in radio_selectors:
-                print(f"        🔍 Trying radio selector: {selector}")
                 radios = await page.query_selector_all(selector)
                 
                 if radios:
-                    print(f"        ✅ Found {len(radios)} radio buttons with selector: {selector}")
-                    
-                    for i, radio in enumerate(radios):
-                        if await radio.is_visible():
-                            radio_value = await radio.get_attribute('value')
-                            radio_id = await radio.get_attribute('id')
-                            print(f"          Radio {i+1}: id='{radio_id}', value='{radio_value}'")
-                    
-                    # For candidateIsPreviousWorker, we want to select "No"
                     if field_id == 'candidateIsPreviousWorker' and value.lower() == 'no':
                         for radio in radios:
                             if await radio.is_visible():
@@ -1055,18 +994,18 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
                                     'no' in radio_value.lower()
                                 ):
                                     await page.check(f'#{radio_id}')
-                                    print(f"        ✅ Selected 'No' radio button: id='{radio_id}', value='{radio_value}'")
+                                    print(f"        ✅ Selected 'No' radio button: {field_id}")
+                                    self.filled_count += 1
                                     return True
                         
                         if len(radios) >= 2:
                             second_radio = radios[1]
                             radio_id = await second_radio.get_attribute('id')
-                            radio_value = await second_radio.get_attribute('value')
                             await page.check(f'#{radio_id}')
-                            print(f"        ✅ Selected second radio option (assuming 'No'): id='{radio_id}', value='{radio_value}'")
+                            print(f"        ✅ Selected second radio option (assuming 'No'): {field_id}")
+                            self.filled_count += 1
                             return True
                     
-                    # General radio button handling for other fields
                     for radio in radios:
                         if await radio.is_visible():
                             radio_value = await radio.get_attribute('value')
@@ -1074,23 +1013,23 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
                             
                             if radio_value and radio_value.lower() == value.lower():
                                 await page.check(f'#{radio_id}')
-                                print(f"        ✅ Selected radio button with exact match: {radio_value}")
+                                print(f"        ✅ Selected radio button with exact match: {field_id}")
+                                self.filled_count += 1
                                 return True
                             
                             if value.lower() == 'no' and radio_value and 'no' in radio_value.lower():
                                 await page.check(f'#{radio_id}')
-                                print(f"        ✅ Selected 'No' radio button: {radio_value}")
+                                print(f"        ✅ Selected 'No' radio button: {field_id}")
+                                self.filled_count += 1
                                 return True
                             elif value.lower() == 'yes' and radio_value and 'yes' in radio_value.lower():
                                 await page.check(f'#{radio_id}')
-                                print(f"        ✅ Selected 'Yes' radio button: {radio_value}")
+                                print(f"        ✅ Selected 'Yes' radio button: {field_id}")
+                                self.filled_count += 1
                                 return True
                     
                     break
-                else:
-                    print(f"        ⚠️ No radio buttons found with selector: {selector}")
-        except Exception as e:
-          print(f"        ❌ Error handling radio buttons for {field_id}: {str(e)}")
+        except Exception:
           return False
             
     
@@ -1099,7 +1038,8 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
         print("  📊 Processing Self Identify page...")
         
         try:
-            today = datetime.datetime.now()
+            
+            today = datetime.now()
             self_identity_fields = {
                 'selfIdentifiedDisabilityData--name': os.getenv('REGISTRATION_FIRST_NAME', '') + ' ' + os.getenv('REGISTRATION_LAST_NAME', ''),
                 'selfIdentifiedDisabilityData--employeeId': ''
@@ -1116,9 +1056,6 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
                     success = await self._fill_field_by_id(page, field_id, value)
                     if success:
                         filled_count += 1
-                        print(f"    ✅ {field_id}: {value}")
-                    else:
-                        print(f"    ⚠️ Not found: {field_id}")
 
             for field_id, value in self_identity_dates.items():
                 if value:
@@ -1178,18 +1115,15 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
               # Try to match the preferred option with our defined categories
               for category, category_options in disability_options.items():
                   if preferred_option in category.lower():
-                      print(f"      🎯 Using preferred option category: {category}")
                       options_to_try = category_options
                       break
               
               # If no category match, try the exact preferred option first
               if not options_to_try:
                   options_to_try = [preferred_option] + disability_options["no answer"]
-                  print(f"      🎯 Using custom preferred option: {preferred_option}")
           else:
               # If no preference specified, use the "no answer" options
               options_to_try = disability_options["no answer"]
-              print("      ℹ️ No preference specified, using default 'no answer' options")
 
           # Try finding labels with specific text content
           for option in options_to_try:
@@ -1204,7 +1138,6 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
                   ]
 
                   for selector in label_selectors:
-                      print(f"      🔍 Looking for: '{selector}'")
                       element = await page.query_selector(selector)
                       
                       if element and await element.is_visible():
@@ -1214,12 +1147,10 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
                           print(f"      ✅ Clicked option: '{option}'")
                           return True
 
-              except Exception as e:
-                  print(f"      ⚠️ Error processing option '{option}': {str(e)}")
+              except Exception:
                   continue
 
           # Fallback: Try finding any visible radio buttons or labels with similar text
-          print("    🔄 Trying fallback approach with fuzzy matching...")
           
           labels = await page.query_selector_all('label, [role="radio"]')
           
@@ -1234,8 +1165,6 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
                   keywords = ["not", "decline", "prefer", "don't", "do not", "choose not"]
           else:
               keywords = ["not", "decline", "prefer", "don't", "do not", "choose not"]
-          
-          print(f"      🔍 Using fallback keywords: {keywords}")
           
           for label in labels:
               if await label.is_visible():
@@ -1257,7 +1186,7 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
                           print(f"      ✅ Clicked fallback option with keyword match: '{label_text}'")
                           return True
                           
-                  except Exception as e:
+                  except Exception:
                       continue
 
           print("    ⚠️ No matching disability options found")
@@ -1306,8 +1235,7 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
                         print("    ✅ Form submitted and page redirected")
                         
                         return True
-                except Exception as e:
-                    print(f"    ⚠️ Error with save selector {selector}: {str(e)}")
+                except Exception:
                     continue
             
             print(f"    ❌ Could not find Save and Continue button")
@@ -1383,9 +1311,6 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
                     success = await self._fill_voluntary_field(page, field_type, value)
                     if success:
                         filled_count += 1
-                        print(f"    ✅ {field_type}: {value}")
-                    else:
-                        print(f"    ⚠️ Could not fill {field_type}")
             
             print(f"  ✅ Voluntary disclosures completed: {filled_count} fields filled")
             return filled_count > 0
@@ -1396,7 +1321,6 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
     
     async def _fill_voluntary_field(self, page, field_type: str, value: str) -> bool:
         """Fill a specific voluntary disclosure field using button-based dropdowns"""
-        print(f"    🔍 Attempting to fill {field_type} with value '{value}'")
         
         try:
             field_button_ids = {
@@ -1416,11 +1340,9 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
             if field_type == 'terms_checkbox':
                 return await self._handle_terms_checkbox(page, value)
             
-            print(f"    ❌ Could not find field for {field_type}")
             return False
             
-        except Exception as e:
-            print(f"    ❌ Error filling {field_type}: {str(e)}")
+        except Exception:
             return False
     
     async def _handle_terms_checkbox(self, page, value: str) -> bool:
@@ -1429,29 +1351,24 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
             checkbox_id = 'termsAndConditions--acceptTermsAndAgreements'
             checkbox_selector = f'input[id="{checkbox_id}"]'
             
-            print(f"      🔍 Looking for terms checkbox with ID: {checkbox_id}")
-            
             checkbox_element = await page.query_selector(checkbox_selector)
             
             if not checkbox_element or not await checkbox_element.is_visible():
-                print(f"        ❌ Terms checkbox not found or not visible")
                 return False
-            
-            print(f"        ✅ Found terms checkbox")
             
             should_check = value.lower() in ['true', 'yes', '1', 'accept', 'agree']
             
             if should_check:
                 await page.check(checkbox_selector)
                 print(f"    ✅ Successfully checked terms and conditions checkbox")
+                self.filled_count += 1
             else:
                 await page.uncheck(checkbox_selector)
                 print(f"    ✅ Successfully unchecked terms and conditions checkbox")
             
             return True
             
-        except Exception as e:
-            print(f"        ❌ Error handling terms checkbox: {str(e)}")
+        except Exception:
             return False
     
     async def handle_experience_page_uploads(self, page) -> bool:
@@ -1546,7 +1463,6 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
         
         for i, selector in enumerate(upload_selectors):
             try:
-                print(f"      🔍 Trying upload selector {i+1}: {selector}")
                 
                 file_inputs = await page.query_selector_all(selector)
                 
@@ -1556,8 +1472,6 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
                         is_enabled = await file_input.is_enabled()
                         input_type = await file_input.get_attribute('type')
                         accept_attr = await file_input.get_attribute('accept')
-                        
-                        print(f"        Input {j+1}: visible={is_visible}, enabled={is_enabled}, type={input_type}, accept={accept_attr}")
                         
                         if input_type == 'file' and is_enabled:
                             await file_input.set_input_files(cv_path)
@@ -1574,12 +1488,10 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
                                 print("        ⚠️ Upload may have succeeded but couldn't verify")
                                 return True
                         
-                    except Exception as e:
-                        print(f"        Error with file input {j+1}: {str(e)}")
+                    except Exception:
                         continue
                         
-            except Exception as e:
-                print(f"      Error with selector {selector}: {str(e)}")
+            except Exception:
                 continue
         
         return await self._try_upload_button_approach(page, cv_path)
@@ -1603,7 +1515,6 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
         
         for selector in upload_button_selectors:
             try:
-                print(f"      🔍 Trying upload button: {selector}")
                 button = await page.query_selector(selector)
                 
                 if button and await button.is_visible() and not await button.is_disabled():
@@ -1625,8 +1536,7 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
                     
                     return True
                     
-            except Exception as e:
-                print(f"      Error with upload button {selector}: {str(e)}")
+            except Exception:
                 continue
         
         return False
@@ -1665,8 +1575,7 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
             
             return False
             
-        except Exception as e:
-            print(f"        Error verifying upload: {str(e)}")
+        except Exception:
             return False
 
     async def check_for_success_url(self, page) -> bool:
