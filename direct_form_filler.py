@@ -68,8 +68,7 @@ class DirectFormFiller:
         today_year = str(today.year)
         today_full_date = f"{today_month}{today_day}{today_year}"
         qualification='Do you certify you meet all minimum qualifications for this job as outlined in the job posting? If you do not recall the minimum qualification for this job, please review the job posting prior to answering this question'
-        messages='''
-        Would you like to receive mobile text message updates relating to your employment relationship with Walmart? If so, choose to Opt-in below.
+        messages='''Would you like to receive mobile text message updates relating to your employment relationship with Walmart? If so, choose to Opt-in below.
 
 Your response to this question will replace any response you’ve provided on previous job applications. If you previously selected Opt-in and now choose to Opt-out, you will not receive text messages for active employment applications. If you choose to Opt-out previously and now choose to Opt-in, you will begin to receive text messages for active employment regarding application status and updates as a new associate.
 
