@@ -370,7 +370,7 @@ class WorkdayFormScraper:
             raise ValueError("Missing required environment variable: WORKDAY_TENANT_URL")
         
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=False)
+            browser = await p.chromium.launch(headless=os.getenv('HEADLESS_STATE',False))
             context = await browser.new_context(
                 viewport={'width': 1534, 'height': 860},
                 user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
