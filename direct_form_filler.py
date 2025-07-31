@@ -34,8 +34,10 @@ class AutomationCompleteException(Exception):
         print("="*80 + "\n")
         if self.success:
             sys.exit(0)  # Exit with success code
+            return True
         else:
             sys.exit(1)  # Exit with error code
+            return False
 
 
 
@@ -64,7 +66,7 @@ class DirectFormFiller:
         # Set up today's date for form filling
         today = datetime.now()
         today_month = str(today.month)
-        today_day = str(today.day)
+        today_day = str(today.day).zfill(2)
         today_year = str(today.year)
         today_full_date = f"{today_month}{today_day}{today_year}"
         qualification='Do you certify you meet all minimum qualifications for this job as outlined in the job posting? If you do not recall the minimum qualification for this job, please review the job posting prior to answering this question'
@@ -108,12 +110,14 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
             # Professional fields
             'currentCompany': os.getenv('CURRENT_COMPANY', ''),
             'currentRole': os.getenv('CURRENT_ROLE', ''),
-            'skills': os.getenv('PRIMARY_SKILLS', ''),
+            # 'skills': os.getenv('PRIMARY_SKILLS', ''),
             # 'education': os.getenv('EDUCATION_MASTERS', ''),
             'github': os.getenv('GITHUB_URL', ''),
             'workAuthorization': 'Yes',
             'visaStatus': 'US Citizen',
             'requiresSponsorship': 'No',
+            "resumeAttachments--attachments":os.getenv('RESUME_PATH', ''),
+    
 
             # Personal info with button dropdown support
             'personalInfoPerson--gender': 'Female', 
@@ -126,28 +130,32 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
             'termsAndConditions--acceptTermsAndAgreements': 'true',
 
             # Application questions
-            qualification: os.getenv('WALMART_QUALIFICATIONS', 'Yes'),
+            # qualification: os.getenv('WALMART_QUALIFICATIONS', 'Yes'),
             
-            messages: os.getenv('WALMART_MESSAGES', 'Opt-Out from receiving text messages from Walmart'),
+            # messages: os.getenv('WALMART_MESSAGES', 'Opt-Out from receiving text messages from Walmart'),
             
-            'Are you legally able to work in the country where this job is located?': os.getenv('WALMART_WORK_ELLIGIBILITY', 'Yes'),
+            # "Do you have the unrestricted right to work in the country to which you're applying?": os.getenv('WORK_ELLIGIBILITY', 'Yes'),
             
-            'Please select your age category:': self._determine_age_group(),
+            # 'Please select your age category:': self._determine_age_group(),
             
-            'Please select your Walmart Associate Status/Affiliation:': os.getenv('WALMART_AFFILATION', 'Have never been an employee of Walmart Inc or any of its subsidiaries'),
+            # 'Please select your Walmart Associate Status/Affiliation:': os.getenv('WALMART_AFFILATION', 'Have never been an employee of Walmart Inc or any of its subsidiaries'),
             
-            'Will you now or in the future require "sponsorship for an immigration-related employment benefit"?    For purposes of this question "sponsorship for an immigration-related employment benefit" means: an H-1B, TN, L-1 or STEM Extension. (Please ask if you are uncertain whether you may need immigration sponsorship or desire clarification.)':os.getenv('REQUIRE_SPONSORSHIP', 'Yes'),
+            # 'Will you now or in the future require "sponsorship for an immigration-related employment benefit"?    For purposes of this question "sponsorship for an immigration-related employment benefit" means: an H-1B, TN, L-1 or STEM Extension. (Please ask if you are uncertain whether you may need immigration sponsorship or desire clarification.)':os.getenv('REQUIRE_SPONSORSHIP', 'Yes'),
             
-            'The following questions are to assist Walmart in determining your eligibility for its industry-leading hiring program for service members from any branch of the Uniformed Services of the United States and military spouses.  If you do not wish to answer these questions, please indicate below, and you can skip this portion of the application process.  If you provide the information on military status, it will not be considered in determining your qualification for any particular position.  Veterans and military spouses may be required to provide proof of their status, such as a DD 214 or Department of Defense Dependent Identification Card, to determine eligibility for this special hiring initiative.  *Uniformed Services are defined as the Army, Navy, Air Force, Marine Corps, Coast Guard, Public Health Service (Commissioned Corps) and the National Oceanic and Atmospheric Administration.  Do you have Active Duty or Guard/Reserve experience in the Uniformed Services of the United States?': os.getenv('ACTIVE_DUTY_STATUS', 'No'),
+            # 'The following questions are to assist Walmart in determining your eligibility for its industry-leading hiring program for service members from any branch of the Uniformed Services of the United States and military spouses.  If you do not wish to answer these questions, please indicate below, and you can skip this portion of the application process.  If you provide the information on military status, it will not be considered in determining your qualification for any particular position.  Veterans and military spouses may be required to provide proof of their status, such as a DD 214 or Department of Defense Dependent Identification Card, to determine eligibility for this special hiring initiative.  *Uniformed Services are defined as the Army, Navy, Air Force, Marine Corps, Coast Guard, Public Health Service (Commissioned Corps) and the National Oceanic and Atmospheric Administration.  Do you have Active Duty or Guard/Reserve experience in the Uniformed Services of the United States?': os.getenv('ACTIVE_DUTY_STATUS', 'No'),
             
-            "Do you have a direct family member who currently works for Walmart or Sam's Club?": os.getenv('FAMILY_MEMBER_WORKS_AT_WALMART', 'No'),
+            # "Do you have a direct family member who currently works for Walmart or Sam's Club?": os.getenv('FAMILY_MEMBER_WORKS_AT_WALMART', 'No'),
             
-            'Does the Legal Name you provided on the “My Information” page match the name on your legal ID?': os.getenv('NAME_LEGAL', 'Yes'),
+            # 'Does the Legal Name you provided on the “My Information” page match the name on your legal ID?': os.getenv('NAME_LEGAL', 'Yes'),
+
+            # "As a U.S. company that exports software and technology internationally, we must comply with U.S. export control laws in every country where we operate. The information provided will be used to determine whether we need to obtain an Export Control License for your employment if you are hired.": os.getenv('CITIZEN_OF_RESTRICTED_NATIONS', 'No'),
+
+            # "Will you now or could you in the future require sponsorship to obtain work authorization or to transfer or extend your current visa? (You must answer “Yes” if your current visa is tied to your spouse or partner’s visa or if you are on a bridging visa or working holiday visa)": os.getenv('REQUIRE_SPONSORSHIP', 'Yes'),
             
-            
+            # "Regarding future positions at Salesforce, please select one of the following options": os.getenv('FUTURE_POSITIONS', 'No'),
 
         }
-    
+
     async def fill_page_by_automation_id(self, page) -> int:
       """Fill all fields on page by finding them with id, data-automation-id, and name attributes"""
       print("  🎯 Direct form filling by id, data-automation-id, and name attributes...")
@@ -223,6 +231,11 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
                 success = await self._handle_question_dropdown(page, field_id, value)
                 if not success:
                     success = await self.fill_by_question_text(page, field_id, value)
+
+                # If standard methods fail for the known problematic question, try the segmented logic
+                if not success and "U.S. company" in field_id:
+                    print(f"  ⚠️ Standard methods failed for '{field_id[:50]}...'. Trying segmented logic as a fallback.")
+                    success = await self.fill_by_segmented_question_text(page, field_id, value)
             else:
                 success = await self._fill_field_by_id(page, field_id, value)
 
@@ -367,6 +380,9 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
             # Special handling for known dropdown fields
             if field_id == 'source--source':
                 return await self._handle_source_dropdown_simple(page, field_id, value)
+              
+            if field_id == 'resumeAttachments--attachments':
+              return await self._upload_cv_file(page,os.getenv('RESUME_PATH', ''))
             
             if field_id == 'phoneNumber--phoneDeviceType':
                 return await self._handle_phone_device_type_dropdown(page, field_id, value)
@@ -711,16 +727,16 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
 
             if not question_element:
                 # Fallback to the original, more flexible search method
-                escaped_text = cleaned_text.replace('"', '\"').replace("'", "\'")
+                escaped_text = cleaned_text.replace('"', '"').replace("'", "'")
                 selectors = [
                     f"text='{escaped_text}'",
                     f'text="{escaped_text}"',
                     f"div:has-text('{escaped_text}')",
-                    f'label:has-text("{escaped_text}")',
-                    f'span:has-text("{escaped_text}")',
-                    f'p:has-text("{escaped_text}")',
-                    '*[role="heading"]:has-text("{escaped_text}")',
-                    '*[class*="question"]:has-text("{escaped_text}")',
+                    f'label:has-text("{escaped_text}")', 
+                    f'span:has-text("{escaped_text}")', 
+                    f'p:has-text("{escaped_text}")', 
+                    '*[role="heading"]:has-text("{escaped_text}")', 
+                    '*[class*="question"]:has-text("{escaped_text}")', 
                     '*:has(> a):has-text("{escaped_text}")'
                 ]
                 for selector in selectors:
@@ -809,6 +825,120 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
             return False
             
         except Exception:
+            return False
+
+    async def fill_by_segmented_question_text(self, page, question_text: str, answer_value: str) -> bool:
+        """
+        Find an answer input associated with a question that may be segmented across multiple elements.
+        This function works by finding all text fragments of the question, calculating a collective
+        bounding box for them, and then finding the nearest input field below that region.
+
+        Args:
+            page: The page object from Playwright.
+            question_text: The full text of the question to identify.
+            answer_value: The value to select or enter in the answer field.
+
+        Returns:
+            True if the field was successfully filled, False otherwise.
+        """
+        print(f"  🧠 Using segmented question logic for: {question_text[:60]}...")
+        try:
+            # 1. Find all fragments of the question text
+            question_fragments = []
+            # Split the question into words and look for elements containing them
+            words = set(re.findall(r'\b\w{4,}\b', question_text.lower())) # Use words of 4+ chars
+            
+            all_text_nodes = await page.query_selector_all('p, span, label, div, b, strong')
+
+            for elem in all_text_nodes:
+                try:
+                    if not await elem.is_visible():
+                        continue
+                    
+                    text_content = (await elem.text_content() or "").lower().strip()
+                    if any(word in text_content for word in words):
+                        box = await elem.bounding_box()
+                        if box and box['width'] > 0 and box['height'] > 0:
+                            question_fragments.append(box)
+                except Exception:
+                    continue
+            
+            if not question_fragments:
+                print("    ⚠️ No visible fragments found for the segmented question.")
+                return False
+
+            # 2. Calculate the collective "Question Region"
+            min_x = min(b['x'] for b in question_fragments)
+            min_y = min(b['y'] for b in question_fragments)
+            max_x = max(b['x'] + b['width'] for b in question_fragments)
+            max_y = max(b['y'] + b['height'] for b in question_fragments)
+            
+            question_region = {
+                'x': min_x,
+                'y': min_y,
+                'width': max_x - min_x,
+                'height': max_y - min_y
+            }
+            print(f"    ✅ Identified question region: {question_region}")
+
+            # 3. Find the closest answer input below this region
+            potential_inputs = await page.query_selector_all(
+                'button[aria-haspopup="listbox"], input[type="radio"], input[type="checkbox"], select'
+            )
+            
+            closest_input = None
+            min_vertical_distance = float('inf')
+
+            for inp in potential_inputs:
+                try:
+                    if not await inp.is_visible():
+                        continue
+                    
+                    inp_box = await inp.bounding_box()
+                    if not inp_box:
+                        continue
+
+                    # Must be below the question region
+                    vertical_distance = inp_box['y'] - (question_region['y'] + question_region['height'])
+                    
+                    # Must have some horizontal overlap
+                    horizontal_overlap = (
+                        inp_box['x'] < question_region['x'] + question_region['width'] and
+                        inp_box['x'] + inp_box['width'] > question_region['x']
+                    )
+
+                    if 0 < vertical_distance < 200 and horizontal_overlap: # 200px is a reasonable threshold
+                        if vertical_distance < min_vertical_distance:
+                            min_vertical_distance = vertical_distance
+                            closest_input = inp
+                except Exception:
+                    continue
+
+            if not closest_input:
+                print("    ⚠️ Could not find a suitable input field near the question region.")
+                return False
+
+            # 4. Handle the found input
+            tag_name = await closest_input.evaluate('el => el.tagName.toLowerCase()')
+            print(f"    🎯 Found closest input: <{tag_name}> at distance {min_vertical_distance:.2f}px")
+
+            if tag_name == 'button':
+                await closest_input.click()
+                await asyncio.sleep(0.8) # Wait for dropdown
+                success = await self._select_dropdown_option_from_listbox(page, answer_value, "segmented-question")
+                if success:
+                    print(f"    ✅ Successfully answered segmented question.")
+                    self.filled_count += 1
+                return success
+            elif tag_name in ['input', 'select']:
+                 # This part can be expanded to handle radio/checkbox groups if needed
+                print(f"    ⚠️ Segmented logic for <{tag_name}> not fully implemented yet.")
+                return False
+
+            return False
+
+        except Exception as e:
+            print(f"    ❌ Error in segmented question logic: {e}")
             return False
 
     @lru_cache(maxsize=1024)
@@ -1405,7 +1535,12 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
         print("    🔍 Looking for select-files button...")
         
         try:
-            select_files_button = await page.query_selector('[data-automation-id="select-files"]')
+          cv_selectors = [
+            '[data-automation-id="select-files"]',
+            '[id="resumeAttachments--attachments"]',
+          ]
+          for attempt in cv_selectors:
+            select_files_button = await page.query_selector(attempt)
             
             if select_files_button and await select_files_button.is_visible():
                 print("    ✅ Found select-files button")
@@ -1438,62 +1573,7 @@ Message and data rates may apply. Message frequency may vary. Text STOP to cance
                 
         except Exception as e:
             print(f"    ❌ Error with select-files button: {str(e)}")
-            return await self._try_fallback_upload_methods(page, cv_path)
-    
-    async def _try_fallback_upload_methods(self, page, cv_path: str) -> bool:
-        """Fallback methods for CV upload if select-files button not found"""
-        print("    🔍 Trying fallback upload methods...")
-        
-        upload_selectors = [
-            'input[type="file"]',
-            'input[accept*=".pdf"]',
-            'input[accept*=".doc"]',
-            'input[accept*="application"]',
-            '[data-automation-id*="upload"]',
-            '[data-automation-id*="file"]',
-            '[data-automation-id*="resume"]',
-            '[data-automation-id*="cv"]',
-            '[data-automation-id*="document"]',
-            'input[id*="upload"]',
-            'input[id*="file"]',
-            'input[name*="resume"]',
-            'input[name*="cv"]'
-        ]
-        
-        for i, selector in enumerate(upload_selectors):
-            try:
-                
-                file_inputs = await page.query_selector_all(selector)
-                
-                for j, file_input in enumerate(file_inputs):
-                    try:
-                        is_visible = await file_input.is_visible()
-                        is_enabled = await file_input.is_enabled()
-                        input_type = await file_input.get_attribute('type')
-                        accept_attr = await file_input.get_attribute('accept')
-                        
-                        if input_type == 'file' and is_enabled:
-                            await file_input.set_input_files(cv_path)
-                            print(f"        ✅ Successfully uploaded CV using selector: {selector}")
-                            
-                            await asyncio.sleep(2)
-                            
-                            upload_confirmed = await self._verify_upload_success(page, cv_path)
-                            
-                            if upload_confirmed:
-                                print("        ✅ Upload confirmed successful")
-                                return True
-                            else:
-                                print("        ⚠️ Upload may have succeeded but couldn't verify")
-                                return True
-                        
-                    except Exception:
-                        continue
-                        
-            except Exception:
-                continue
-        
-        return await self._try_upload_button_approach(page, cv_path)
+            return await self._try_upload_button_approach(page, cv_path)
     
     async def _try_upload_button_approach(self, page, cv_path: str) -> bool:
         """Try to find upload buttons that trigger file selection dialogs"""
