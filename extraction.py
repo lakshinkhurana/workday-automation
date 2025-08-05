@@ -340,6 +340,21 @@ class WorkdayScraper:
         await self._traverse_and_extract(page)
 
         print(f"\n✅ Extraction Complete. Found {len(self.form_elements)} form elements across {len(self.discovered_pages)} pages.")
+
+        # Serialize and save the extracted data
+        output_path = "workday_forms_complete.json"
+        print(f"\n💾 Saving extracted data to {output_path}...")
+        try:
+            # Convert list of FormElement objects to a list of dictionaries
+            form_elements_dict = [element.__dict__ for element in self.form_elements]
+            
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(form_elements_dict, f, ensure_ascii=False, indent=4)
+            
+            print(f"  ✅ Successfully saved data to {output_path}")
+        except Exception as e:
+            print(f"  ❌ Error saving data to JSON file: {e}")
+
         return self.form_elements
 
     async def _click_job_title_link(self, page: Page) -> bool:
