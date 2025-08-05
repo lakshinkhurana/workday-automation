@@ -9,7 +9,7 @@ structured format.
 import asyncio
 import json
 import os
-import time
+from datetime import datetime
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -53,7 +53,7 @@ class FormExtractor:
         """Extracts all form elements from a single page, filtering out clutter."""
         print(f"  📝 Extracting forms from: {page_info.title}")
         page_forms = []
-
+        await asyncio.sleep(5)  # Allow time for the page to load fully
         elements = await page.query_selector_all('input, select, textarea, button[type="button"], button[data-automation-id]')
         print(f"  🕵️‍♂️ Found {len(elements)} potential form elements. Analyzing structure:")
 
@@ -379,6 +379,113 @@ class WorkdayScraper:
             # It might be that we are already on the application page
             return True
 
+    async def _is_self_identity_page(self, page: Page) -> bool:
+        """Check if the current page is the Self Identity page"""
+        try:
+            # Look for unique identifiers of the Self Identity page
+            indicators = [
+                '[data-automation-id*="selfIdentifiedDisabilityData"]',
+                'input[id*="selfIdentifiedDisabilityData"]',
+                'text="Self Identification"',
+                'text="Disability Status"',
+                'text="Voluntary Self-Identification"'
+            ]
+          
+            for indicator in indicators:
+              element = page.locator(indicator).first
+              if await element.is_visible():
+                  print(f"    ✅ Found Self Identity page indicator: {indicator}")
+                  return True
+            return False
+        except Exception as e:
+          print(f"    ❌ Error checking for Self Identity page: {str(e)}")
+          return False
+
+    async def _handle_self_identity_page(self, page: Page) -> bool:
+        """Handle Self Identify page - fill name, date, checkboxes and press Save and Continue"""
+        print("  📊 Processing Self Identity page...")
+        
+        try:
+            # Use a more robust selector that checks id, data-automation-id, and name
+            name_locator = page.locator(
+                '[data-automation-id="selfIdentifiedDisabilityData--name"], ' \
+                '[id="selfIdentifiedDisabilityData--name"], ' \
+                '[name="selfIdentifiedDisabilityData--name"]'
+            ).first
+            
+            # Wait for the element to be ready before proceeding
+            await name_locator.wait_for(timeout=15000)
+
+            today = datetime.now()
+            
+            # Fill name field
+            legal_name = os.getenv('LEGAL_NAME', '')
+            if legal_name:
+                await name_locator.fill(legal_name)
+                print("    ✅ Filled name field.")
+
+            # Fill date fields
+            await page.locator('[id="selfIdentifiedDisabilityData--dateSignedOn-dateSectionMonth-input"]').fill(str(today.month))
+            await page.locator('[id="selfIdentifiedDisabilityData--dateSignedOn-dateSectionDay-input"]').fill(str(today.day))
+            await page.locator('[id="selfIdentifiedDisabilityData--dateSignedOn-dateSectionYear-input"]').fill(str(today.year))
+            print("    ✅ Filled date fields.")
+
+            # Handle disability checkboxes
+            preferred_option = os.getenv('DISABILITY_STATUS', 'no answer').lower()
+            
+            disability_options = {
+                "no answer": [
+                    "I do not wish to answer",
+                    "I do not want to answer",
+                    "I prefer not to answer",
+                    "Choose not to identify",
+                    "Decline to answer",
+                    "Prefer not to disclose",
+                    "Do not wish to identify"
+                ],
+                "yes": [
+                    "Yes, I have a disability, or have had one in the past",
+                    "Yes",
+                    "I have a disability",
+                    "Person with disability"
+                ],
+                "no": [
+                    "No, I don't have a disability and have not had one in the past",
+                    "No",
+                    "I do not have a disability",
+                    "No disability"
+                ]
+            }
+
+            options_to_try = disability_options.get(preferred_option, disability_options["no answer"])
+
+            for option_text in options_to_try:
+                try:
+                    # Using a more robust selector to find the label and then the associated radio button
+                    label_locator = page.locator(f'label:has-text("{option_text}")')
+                    if await label_locator.is_visible():
+                        await label_locator.click()
+                        print(f"      ✅ Clicked option: '{option_text}'")
+                        break
+                except Exception:
+                    continue
+            
+            # Press Save and Continue
+            nav_selector = 'button[data-automation-id="pageFooterNextButton"], button:has-text("Continue"), button:has-text("Save and Continue")'
+            nav_button = page.locator(nav_selector).first
+            if await nav_button.is_visible():
+                await nav_button.click()
+                await page.wait_for_load_state("networkidle", timeout=15000)
+                print("    ✅ Clicked 'Save and Continue'.")
+                return True
+            else:
+                print("    ⚠️ Could not find 'Save and Continue' button.")
+                return False
+                
+        except Exception as e:
+            print(f"  ❌ Error handling Self Identity page: {str(e)}")
+            return False
+
     async def _traverse_and_extract(self, page: Page):
         """
         Traverses the application flow by tracking the active step in the progress bar,
@@ -390,6 +497,14 @@ class WorkdayScraper:
 
         for _ in range(max_steps):
             try:
+                # Check if we are on the self-identity page
+                if await self._is_self_identity_page(page):
+                    if await self._handle_self_identity_page(page):
+                        continue
+                    else:
+                        print("  🛑 Failed to handle the Self Identity page. Ending traversal.")
+                        break
+
                 # 1. Identify the current active step
                 active_step_locator = page.locator('[data-automation-id="progressBarActiveStep"]')
                 await active_step_locator.wait_for(timeout=10000)
@@ -398,9 +513,9 @@ class WorkdayScraper:
                 if active_step_text in self.processed_steps:
                     print(f"  ✅ Reached a previously processed step ('{active_step_text}'). Ending traversal.")
                     break
-                  
-                await asyncio.sleep(3)  # Allow time for the step to stabilize
                 
+                # The wait for the active step locator at the start of the loop is sufficient.
+                # The sleep(3) is removed for more reliable waiting.
                 print(f"📄 Processing step: {active_step_text}")
 
                 # 2. Extract forms from the current step
@@ -429,9 +544,18 @@ class WorkdayScraper:
                 nav_selector = 'button[data-automation-id="pageFooterNextButton"], button:has-text("Continue"), button:has-text("Save and Continue")'
                 nav_button = page.locator(nav_selector).first
                 if await nav_button.is_visible():
-                    await nav_button.click()
-                    await page.wait_for_load_state("networkidle", timeout=15000)
-                    await asyncio.sleep(2)
+                    previous_step_text = active_step_text
+                    await nav_button.click(force=True)
+                    print('😴 Sleeping till loaded ')
+                    await asyncio.sleep(10)
+                    
+                    # Wait for the page to transition by checking that the active step has changed.
+                    # This is more reliable than waiting for network idle.
+                    print(f"  → Clicked 'Continue'. Waiting for next step after '{previous_step_text.replace('', '')}'...")
+                    # Sanitize the text for the CSS selector by wrapping it in quotes using json.dumps.
+                    sanitized_step_text = json.dumps(previous_step_text)
+                    await page.locator(f"[data-automation-id='progressBarActiveStep']:not(:text-is({sanitized_step_text}))").wait_for(timeout=20000)
+                    print("  ✅ Next step loaded.")
                 else:
                     print("  🛑 No 'Continue' or 'Next' button found. Ending traversal.")
                     break

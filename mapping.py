@@ -32,9 +32,9 @@ FIELD_MAPPINGS = {
 
     # Self Identity fields
     'selfIdentifiedDisabilityData--name': 'LEGAL_NAME',
-    'selfIdentifiedDisabilityData--dateSignedOn-dateSectionMonth-input': 'TODAY_MONTH',
-    'selfIdentifiedDisabilityData--dateSignedOn-dateSectionDay-input': 'TODAY_DAY',
-    'selfIdentifiedDisabilityData--dateSignedOn-dateSectionYear-input': 'TODAY_YEAR',
+    # 'selfIdentifiedDisabilityData--dateSignedOn-dateSectionMonth-input': 'TODAY_MONTH',
+    # 'selfIdentifiedDisabilityData--dateSignedOn-dateSectionDay-input': 'TODAY_DAY',
+    # 'selfIdentifiedDisabilityData--dateSignedOn-dateSectionYear-input': 'TODAY_YEAR',
     
     # Professional fields
     'currentCompany': 'CURRENT_COMPANY',
@@ -137,7 +137,7 @@ class DataMapper:
                 if not field_id:
                     print(f"  ⚠️ Warning: Radio button with label '{element.get('label')}' has no 'name' attribute. Skipping.")
                     continue
-                
+
                 if field_id in processed_radio_groups:
                     continue # Already processed this group
                 
@@ -149,7 +149,7 @@ class DataMapper:
                     print(f"  ⚠️ Warning: Form element with label '{element.get('label')}' has no 'id_of_input_component'. Skipping.")
                     continue
 
-            env_var = self._find_env_variable_for_field(field_id, element.get('label', ''))
+            env_var = self._find_env_variable_for_field(field_id)
             if not env_var:
                 continue
 
@@ -171,26 +171,20 @@ class DataMapper:
         print(f"✅ Successfully mapped {len(mapped_fields)} fields to data.")
         return mapped_fields
 
-    def _find_env_variable_for_field(self, field_id: str, field_label: str) -> Optional[str]:
+    def _find_env_variable_for_field(self, field_id: str) -> Optional[str]:
         """
-        Finds the corresponding environment variable for a given form field using
-        exact and fuzzy matching.
+        Finds the corresponding environment variable for a given form field using its ID.
         """
         field_id_lower = field_id.lower()
-        field_label_lower = field_label.lower()
 
-        # Check for exact matches in our mapping
+        # Prioritize exact match on field_id
+        if field_id in FIELD_MAPPINGS:
+            return FIELD_MAPPINGS[field_id]
+
+        # Fallback to checking if any part of the field_id contains a mapping key
         for key, env_var in FIELD_MAPPINGS.items():
-            if key.lower() in field_id_lower or key.lower() in field_label_lower:
+            if key.lower() in field_id_lower:
                 return env_var
-
-        # A simple fuzzy match: check if any part of the label/id contains a keyword
-        for keyword, env_var in FIELD_MAPPINGS.items():
-            # Split multi-word keywords for better matching (e.g., "firstName")
-            sub_keywords = re.findall('[A-Z][^A-Z]*', keyword) or [keyword]
-            for sub_key in sub_keywords:
-                if sub_key.lower() in field_id_lower or sub_key.lower() in field_label_lower:
-                    return env_var
         
         return None
 
