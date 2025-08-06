@@ -9,6 +9,7 @@ from playwright.async_api import async_playwright
 from extraction import WorkdayScraper
 from mapping import DataMapper
 from filling import FormFiller
+from base_exceptions import AutomationCompleteException
 
 async def main():
     """
@@ -32,10 +33,16 @@ async def main():
             print("🚀 --- Starting Workday Automation ---")
             scraper = WorkdayScraper(tenant_url)
             await scraper.scrape_site(page)
+            
+            if os.getenv("WORKDAY_END_URL") and page.url == os.getenv("WORKDAY_END_URL"):
+              print("  ✅ Application complete.")
+              raise AutomationCompleteException("Reached the Review step, ending traversal.")
 
             print("\n🎉 Automation process finished. The browser will close in 10 seconds. 🎉")
             await asyncio.sleep(10)
 
+        except AutomationCompleteException as e:
+            e.display_completion_message()
         except Exception as e:
             print(f"An error occurred during the automation process: {e}")
         finally:
