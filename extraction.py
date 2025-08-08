@@ -122,6 +122,7 @@ class FormExtractor:
                 'pageFooter', 'navigation', 'breadcrumb', 'menu', 'header', 'footer',
                 'modal', 'dialog', 'popup', 'tooltip', 'dropdown-toggle', 'collapse',
                 'accordion', 'tab', 'sidebar', 'overlay', 'backdrop','settings','account','hammy',
+                'alphabetically'
             ]
             
             # UI state and control elements
@@ -315,13 +316,13 @@ class WorkdayScraper:
         Main scraping orchestration method.
         Navigates through the application process and extracts form data.
         """
-        print("🌐 Phase 1: Navigating to initial page and finding job.")
+        # print("🌐 Phase 1: Navigating to initial page and finding job.")
         await page.goto(self.tenant_url, wait_until="domcontentloaded")
         await page.wait_for_load_state("networkidle")
 
-        if not await self._click_job_title_link(page):
-            print("❌ Error: Could not find a job title link to start the process.")
-            return []
+        # if not await self._click_job_title_link(page):
+        #     print("❌ Error: Could not find a job title link to start the process.")
+        #     return []
 
         print("\n🔒 Phase 2: Clicking Apply and handling login/account creation.")
         if not await self._click_apply_button(page):
