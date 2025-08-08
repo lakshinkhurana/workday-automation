@@ -29,6 +29,7 @@ FIELD_MAPPINGS = {
     'address--countryRegion': 'STATE',
     'address--postalCode': 'POSTAL_CODE',
     'phoneNumber--phoneType':'PHONE_DEVICE_TYPE',
+    'address--regionSubdivision1':'COUNTY',
 
     # Self Identity fields
     'selfIdentifiedDisabilityData--name': 'LEGAL_NAME',
@@ -43,7 +44,6 @@ FIELD_MAPPINGS = {
     'workAuthorization': 'WORK_AUTHORIZATION',
     'visaStatus': 'VISA_STATUS',
     'requiresSponsorship': 'SPONSORSHIP_REQUIRED',
-    "resumeAttachments--attachments": 'RESUME_PATH',
     'select-files': 'RESUME_PATH',
     'file-upload-input-ref': 'RESUME_PATH',
 
@@ -70,6 +70,8 @@ FIELD_MAPPINGS = {
     "As a U.S. company that exports software and technology internationally, we must comply with U.S. export control laws in every country where we operate.": 'CITIZEN_OF_RESTRICTED_NATIONS',
     "Will you now or could you in the future require sponsorship to obtain work authorization or to transfer or extend your current visa?": 'REQUIRE_SPONSORSHIP',
     "Regarding future positions at Salesforce, please select one of the following options": 'FUTURE_POSITIONS',
+    'Are you legally authorized to work in the country to which you are applying?': 'LEGAL_WORK_AUTH',
+    'Will you require sponsorship to continue and/or extend your current work authorization status?': 'SPONSORSHIP_REQUIRED',
 }
 
 # Dropdown mappings help translate environment variable values into specific

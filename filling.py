@@ -9,6 +9,7 @@ with the web page and fill in the form fields.
 
 import asyncio
 import os
+import re
 from typing import List
 from playwright.async_api import Page, Locator
 
@@ -21,7 +22,7 @@ class FormFiller:
     This is a refactored and lightweight version of the original DirectFormFiller.
     """
 
-    async def create_account(self, page: Page) -> bool:
+    async def create_account(self, page: Page, signInMode: bool = False) -> bool:
         """
         Creates a new account using the specified data-automation-ids.
 
@@ -31,36 +32,49 @@ class FormFiller:
         Returns:
             True if account creation was successful, False otherwise.
         """
-        print("🔐 Attempting to create a new account...")
+        print("🔐 Attempting to create account...")
         try:
-            # Retrieve credentials from environment variables
             email = os.getenv("WORKDAY_USERNAME")
             password = os.getenv("WORKDAY_PASSWORD")
 
             if not email or not password:
                 print("  ❌ Error: WORKDAY_USERNAME or WORKDAY_PASSWORD not set in .env file.")
                 return False
+            if signInMode:
+              await page.locator('[data-automation-id="signInLink"]').click(force=True)
+              await asyncio.sleep(2)  # Wait for the sign-in form to appear
+              
+              await page.locator('[data-automation-id="email"]').fill(email)
+              await page.locator('[data-automation-id="password"]').fill(password)
+              
+              print("  ✅ Filled email and password fields.")
+              await page.locator('button[data-automation-id="signInSubmitButton"]').click(force=True)
+              print("  ✅ Clicked the sign-in submit button.")
 
-            # Fill the form fields using data-automation-id
-            await page.locator('[data-automation-id="email"]').fill(email)
-            await page.locator('[data-automation-id="password"]').fill(password)
-            await page.locator('[data-automation-id="verifyPassword"]').fill(password)
+              await page.wait_for_load_state("networkidle", timeout=30000)
             
-            print("  ✅ Filled email and password fields.")
+              print("🎉 Account creation successful.")
+              return True
+            else:
+              await page.locator('[data-automation-id="email"]').fill(email)
+              await page.locator('[data-automation-id="password"]').fill(password)
+              await page.locator('[data-automation-id="verifyPassword"]').fill(password)
+            
+              print("  ✅ Filled email and password fields.")
 
-            # Click the checkbox-like element
-            await page.locator('[data-automation-id="createAccountCheckbox"]').click()
-            print("  ✅ Clicked the account creation checkbox.")
+              # Click the checkbox-like element
+              await page.locator('[data-automation-id="createAccountCheckbox"]').click()
+              print("  ✅ Clicked the account creation checkbox.")
 
             # Click the submit button, ensuring it's a button element
-            await page.locator('button[data-automation-id="createAccountSubmitButton"]').click(force=True)
-            print("  ✅ Clicked the create account submit button.")
+              await page.locator('button[data-automation-id="createAccountSubmitButton"]').click(force=True)
+              print("  ✅ Clicked the create account submit button.")
 
             # Wait for navigation to complete, indicating success
-            await page.wait_for_load_state("networkidle", timeout=30000)
+              await page.wait_for_load_state("networkidle", timeout=30000)
             
-            print("🎉 Account creation successful.")
-            return True
+              print("🎉 Account creation successful.")
+              return True
         except Exception as e:
             print(f"  ❌ Error during account creation: {e}")
             return False
@@ -142,14 +156,22 @@ class FormFiller:
             await element.type(field.value_to_fill, delay=100)
             await element.press('Enter')
           else:
-            try:
-                if await element.input_value() == str(field.value_to_fill):
-                    print(f"  🛑 Info: Field '{field.label}' already has the correct value. Skipping.")
+            if field.field_type == 'file-selector':
+                # Check if a file with the same name is already listed as uploaded
+                file_name = os.path.basename(field.value_to_fill)
+                # Look for a specific element that indicates a file is already uploaded
+                uploaded_file_selector = f'[id="resumeAttachments--attachments"]:has-text("{file_name}")'
+                if await page.locator(uploaded_file_selector).is_visible():
+                    print(f"  🛑 Info: File '{file_name}' is already uploaded. Skipping.")
                     return True
-            except Exception:
-                # If input_value() is not applicable (e.g., for custom dropdowns) or fails,
-                # we proceed with the specific fill method.
-                pass
+            else:
+                try:
+                    if await element.input_value() == str(field.value_to_fill):
+                        print(f"  🛑 Info: Field '{field.label}' already has the correct value. Skipping.")
+                        return True
+                except Exception:
+                    # If input_value() is not applicable or fails, proceed with the fill method
+                    pass
             
             await fill_method(element, field.value_to_fill)
             print(f"  ✅ Successfully filled '{field.label}'.")
@@ -273,3 +295,4 @@ class FormFiller:
 
         print("  🛑 Info: Could not find a button to navigate to the next page. Process may be complete.")
         return False
+    

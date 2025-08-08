@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional
 from playwright.async_api import Page, ElementHandle
 from filling import FormFiller
 from mapping import DataMapper
-
+from base_exceptions import AutomationCompleteException
 # Configuration
 DEFAULT_TIMEOUT = 30000
 
@@ -122,7 +122,7 @@ class FormExtractor:
                 'pageFooter', 'navigation', 'breadcrumb', 'menu', 'header', 'footer',
                 'modal', 'dialog', 'popup', 'tooltip', 'dropdown-toggle', 'collapse',
                 'accordion', 'tab', 'sidebar', 'overlay', 'backdrop','settings','account','hammy',
-                'alphabetically'
+                'alphabetically', 'cookies' ,'decline'
             ]
             
             # UI state and control elements
@@ -226,7 +226,7 @@ class FormExtractor:
             label = await page.query_selector(f'label[for="{element_id}"]')
             if label:
                 return await label.inner_text()
-        
+
         # Fallback strategies
         for attr in ['aria-label', 'placeholder']:
             value = await element.get_attribute(attr)
@@ -331,7 +331,7 @@ class WorkdayScraper:
 
         # After applying, we expect a login/create account page.
         filler = FormFiller()
-        if not await filler.create_account(page):
+        if not await filler.create_account(page , signInMode=os.getenv('SIGNIN_MODE', 'False').lower() == 'true'):
             print("❌ Error: Account creation failed. The process cannot continue.")
             return []
           
@@ -510,6 +510,9 @@ class WorkdayScraper:
         max_steps = 10  # Safety break to prevent infinite loops
         data_mapper = DataMapper()
         form_filler = FormFiller()
+        if os.getenv("WORKDAY_END_URL") and page.url == os.getenv("WORKDAY_END_URL"):
+              print("  ✅ Application complete.")
+              raise AutomationCompleteException("Reached the Review step, ending traversal.")
 
         for _ in range(max_steps):
             try:
